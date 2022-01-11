@@ -1,0 +1,25 @@
+# To prevent storing dev/temporary container data
+.git
+.gitignore
+.gitlab*
+node_modules-*
+npm-debug.log
+Dockerfile*
+docker-compose*
+.dockerignore
+ci-tooling
+.DS_Store
+.svn/
+*.swp
+*.bak
+*.tmp
+*.save
+*.log
+*~
+# Various IDEs
+.project
+.idea/
+*.tmproj
+# Variables
+.env
+.env*
