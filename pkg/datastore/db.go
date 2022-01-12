@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"analitics-go/pkg/application"
 	"fmt"
 	"log"
 	"os"
@@ -17,17 +18,19 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func InitDB(debug bool) *sql.DB {
-	dbHost := os.Getenv("CLICKHOUSE_HOST")
-	dbPort := os.Getenv("CLICKHOUSE_PORT")
-	dbName := os.Getenv("CLICKHOUSE_DB")
-	dbUser := os.Getenv("CLICKHOUSE_USER")
-	dbPass := os.Getenv("CLICKHOUSE_PASS")
-	dbCaCert := os.Getenv("CLICKHOUSE_CA")
+type AppConfig struct {
+	application.Config
+}
 
-	dsn := "tcp://" + dbHost + ":" + string(dbPort) + "?compress=true&username=" + dbUser + "&password=" + dbPass + "&database=" + dbName
-	if _, err := os.Stat(dbCaCert); err == nil {
-		caCert, err := ioutil.ReadFile(dbCaCert)
+func New(cfg *application.Config) *sql.DB {
+	return InitDB(cfg)
+}
+
+func InitDB(cfg *application.Config) *sql.DB {
+	dbParams := cfg.Database
+	dsn := "tcp://" + dbParams.Host + ":" + string(dbParams.Port) + "?compress=true&username=" + dbParams.User + "&password=" + dbParams.Pass + "&database=" + dbParams.Name
+	if _, err := os.Stat(dbParams.CertPath); err == nil {
+		caCert, err := ioutil.ReadFile(dbParams.CertPath)
 		if err != nil {
 			log.Fatalf("Couldn't load file", err)
 		}
@@ -39,7 +42,7 @@ func InitDB(debug bool) *sql.DB {
 		dsn += "&secure=true&tls_config=yandex-cloud"
 	}
 
-	if debug {
+	if cfg.Debug {
 		dsn += "&debug=true"
 	}
 

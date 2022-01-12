@@ -1,0 +1,27 @@
+---
+database:
+  host: ${CLICKHOUSE_HOST}
+  port: ${CLICKHOUSE_PORT}
+  name: ${CLICKHOUSE_DB}
+  user: ${CLICKHOUSE_USER}
+  pass: ${CLICKHOUSE_PASS}
+  caCert: ${CLICKHOUSE_CA}
+daemons:
+  watcher:
+    memory-limit: 33554432
+    sleep: 5
+    daemons:
+      import:
+        enabled: true
+  import:
+    memory-limit: 33554432
+    sleep: 5
+    params:
+      client:
+        host: ${EXCHANGE_HOST}
+        username: ${EXCHANGE_USER}
+        password: ${EXCHANGE_PASSWORD}
+    daemons:
+      name: product-price
+        enabled: true
+        sleep: 60
