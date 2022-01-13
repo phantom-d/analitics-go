@@ -77,7 +77,10 @@ func (app *Application) GetConfig() *Application {
 func (app *Application) Run() {
 	if app.MigrateUp {
 		db := datastore.New(structs.Map(app))
-		datastore.MigrateUp(db)
+		err := datastore.MigrateUp(db)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	if app.Daemon == "watcher" {
