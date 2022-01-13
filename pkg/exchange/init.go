@@ -1,6 +1,6 @@
 package exchange
 
-import "analitics-go/pkg/application"
+import "analitics/pkg/application"
 
 type Exchange struct {
 	Config application.Daemon

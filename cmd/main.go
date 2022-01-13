@@ -1,12 +1,8 @@
 package main
 
 import (
-	"analitics-go/pkg/application"
+	"analitics/pkg/application"
 )
-
-type AppConfig struct {
-	application.Application
-}
 
 func main() {
 	app := application.New()

@@ -1,7 +1,7 @@
 package datastore
 
 import (
-	"analitics-go/pkg/application"
+	"analitics/pkg/application"
 	"fmt"
 	"log"
 	"os"

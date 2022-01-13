@@ -1,8 +1,8 @@
 package application
 
 import (
-	"analitics-go/pkg/datastore"
-	"analitics-go/transport"
+	"analitics/pkg/datastore"
+	"analitics/transport"
 	goflag "flag"
 	"fmt"
 	"github.com/rs/zerolog/log"

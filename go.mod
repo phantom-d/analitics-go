@@ -1,4 +1,4 @@
-module analitics-go
+module analitics
 
 go 1.17
 
