@@ -2,14 +2,17 @@ package application
 
 import (
 	"analitics/pkg/datastore"
-	"analitics/transport"
+	"analitics/pkg/transport"
+
 	goflag "flag"
 	"fmt"
+	"io/ioutil"
+	"os"
+
+	"github.com/fatih/structs"
 	"github.com/rs/zerolog/log"
 	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
-	"os"
 )
 
 type Application struct {
@@ -19,7 +22,7 @@ type Application struct {
 	MigrateUp  bool
 	Database   struct {
 		Host     string `yaml:"host"`
-		Port     int64  `yaml:"port"`
+		Port     string `yaml:"port"`
 		Name     string `yaml:"name"`
 		User     string `yaml:"user"`
 		Pass     string `yaml:"pass"`
@@ -73,12 +76,12 @@ func (app *Application) GetConfig() *Application {
 
 func (app *Application) Run() {
 	if app.MigrateUp {
-		db := datastore.New(app)
+		db := datastore.New(structs.Map(app))
 		datastore.MigrateUp(db)
 	}
 
 	if app.Daemon == "watcher" {
-		db := datastore.New(app)
+		db := datastore.New(structs.Map(app))
 		server := transport.NewServer(db)
 		fmt.Println("server is starting...")
 		err := server.Start()
