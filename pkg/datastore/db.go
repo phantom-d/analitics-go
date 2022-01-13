@@ -19,14 +19,14 @@ import (
 )
 
 type AppConfig struct {
-	application.Config
+	application.Application
 }
 
-func New(cfg *application.Config) *sql.DB {
+func New(cfg *application.Application) *sql.DB {
 	return InitDB(cfg)
 }
 
-func InitDB(cfg *application.Config) *sql.DB {
+func InitDB(cfg *application.Application) *sql.DB {
 	dbParams := cfg.Database
 	dsn := "tcp://" + dbParams.Host + ":" + string(dbParams.Port) + "?compress=true&username=" + dbParams.User + "&password=" + dbParams.Pass + "&database=" + dbParams.Name
 	if _, err := os.Stat(dbParams.CertPath); err == nil {

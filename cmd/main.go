@@ -5,10 +5,10 @@ import (
 )
 
 type AppConfig struct {
-	application.Config
+	application.Application
 }
 
 func main() {
-	cfg := application.GetConfig()
-	application.Run(cfg)
+	app := application.New()
+	app.Run()
 }
