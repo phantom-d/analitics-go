@@ -1,65 +1,30 @@
 package datastore
 
 import (
-	"fmt"
-	"log"
-	"os"
-
-	"crypto/tls"
-	"crypto/x509"
 	"database/sql"
-	"io/ioutil"
-
-	"github.com/ClickHouse/clickhouse-go"
+	"fmt"
 	"github.com/golang-migrate/migrate/v4"
+	"os"
+	"reflect"
+	"strings"
 
 	mclickhouse "github.com/golang-migrate/migrate/v4/database/clickhouse"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func New(cfg map[string]interface{}) *sql.DB {
-	return InitDB(cfg["Database"].(map[string]interface{}), cfg["Debug"].(bool))
+type Datastore struct {
+	config  map[string]interface{}
+	connect *sql.DB
 }
 
-func InitDB(dbParams map[string]interface{}, debug bool) *sql.DB {
-	dsn := "tcp://" + dbParams["Host"].(string)
-	dsn += ":" + dbParams["Port"].(string)
-	dsn += "?compress=true&username=" + dbParams["User"].(string)
-	dsn += "&password=" + dbParams["Pass"].(string)
-	dsn += "&database=" + dbParams["Name"].(string)
-
-	certPath := dbParams["CertPath"].(string)
-	if _, err := os.Stat(certPath); err == nil {
-		caCert, err := ioutil.ReadFile(certPath)
-		if err != nil {
-			log.Fatalf("Couldn't load file", err)
-		}
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-		config := &tls.Config{RootCAs: caCertPool}
-
-		clickhouse.RegisterTLSConfig("yandex-cloud", config)
-		dsn += "&secure=true&tls_config=yandex-cloud"
-	}
-
-	if debug {
-		dsn += "&debug=true"
-	}
-
-	connect, err := sql.Open("clickhouse", dsn)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := connect.Ping(); err != nil {
-		if exception, ok := err.(*clickhouse.Exception); ok {
-			fmt.Printf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-		} else {
-			fmt.Println(err)
-		}
-		return nil
-	}
-
-	return connect
+func New(cfg map[string]interface{}) *sql.DB {
+	ds := &Datastore{config: cfg["Database"].(map[string]interface{})}
+	name := ds.config["type"].(string)
+	args := make(map[string]interface{}, 0)
+	args["arg0"] = cfg["Debug"].(bool)
+	result := DynamicCall(ds, strings.Title(strings.ToLower(name))+"Connect", args)
+	value := reflect.ValueOf(result[0]).Interface().(*sql.DB)
+	return value
 }
 
 func MigrateUp(db *sql.DB) error {
@@ -75,4 +40,13 @@ func MigrateUp(db *sql.DB) error {
 		return err
 	}
 	return m.Up()
+}
+
+func DynamicCall(obj interface{}, fn string, args map[string]interface{}) (res []reflect.Value) {
+	method := reflect.ValueOf(obj).MethodByName(fn)
+	var inputs []reflect.Value
+	for _, v := range args {
+		inputs = append(inputs, reflect.ValueOf(v))
+	}
+	return method.Call(inputs)
 }
