@@ -15,24 +15,31 @@ import (
 func (ds *Datastore) ClickhouseConnect(debug bool) *sql.DB {
 	dsn := "tcp://" + ds.config["host"].(string)
 	dsn += ":" + strconv.Itoa(ds.config["port"].(int))
-	dsn += "?compress=true&username=" + ds.config["user"].(string)
-	dsn += "&password=" + ds.config["pass"].(string)
+	dsn += "?compress=true"
 	dsn += "&database=" + ds.config["name"].(string)
 
-	certPath := ds.config["cert-path"].(string)
-	if _, err := os.Stat(certPath); err == nil {
-		caCert, err := ioutil.ReadFile(certPath)
-		if err != nil {
-			log.Fatalf("Couldn't load file: %s", err)
+	if _, ok := ds.config["user"].(string); ok {
+		dsn += "&username=" + ds.config["user"].(string)
+		if _, ok := ds.config["pass"].(string); ok {
+			dsn += "&password=" + ds.config["pass"].(string)
 		}
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-		config := &tls.Config{RootCAs: caCertPool}
+	}
 
-		if err := clickhouse.RegisterTLSConfig(certPath, config); err != nil {
-			log.Fatalf("Couldn't register tls config: %s", err)
+	if certPath, ok := ds.config["cert-path"].(string); ok {
+		if _, err := os.Stat(certPath); err == nil {
+			caCert, err := ioutil.ReadFile(certPath)
+			if err != nil {
+				log.Fatalf("Couldn't load file: %s", err)
+			}
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(caCert)
+			config := &tls.Config{RootCAs: caCertPool}
+
+			if err := clickhouse.RegisterTLSConfig(certPath, config); err != nil {
+				log.Fatalf("Couldn't register tls config: %s", err)
+			}
+			dsn += "&secure=true&tls_config=" + certPath
 		}
-		dsn += "&secure=true&tls_config=" + certPath
 	}
 
 	if debug {

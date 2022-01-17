@@ -1,17 +1,16 @@
 package application
 
 import (
-	"analitics/pkg/datastore"
-	"analitics/pkg/transport"
+	"analitics/pkg/logger"
 	"database/sql"
 	"github.com/fatih/structs"
-
-	"fmt"
+	"github.com/rs/zerolog"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 
-	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
+	"analitics/pkg/datastore"
+	"analitics/pkg/exchange/daemons"
 )
 
 type Application struct {
@@ -22,9 +21,11 @@ type Application struct {
 	Database   map[string]interface{} `yaml:"database"`
 	Daemons    map[string]Daemon
 	db         *sql.DB
+	logger     *logger.Logger
 }
 
 type Daemon struct {
+	Enabled     bool                   `yaml:"enabled"`
 	MemoryLimit int64                  `yaml:"memory-limit"`
 	Sleep       int64                  `yaml:"sleep"`
 	Threads     []Threads              `yaml:"threads"`
@@ -40,6 +41,7 @@ type Threads struct {
 
 func New(app *Application) *Application {
 	app.GetConfig()
+	app.logger = logger.New(app.Debug)
 	return app
 }
 
@@ -52,7 +54,6 @@ func (app *Application) GetConfig() *Application {
 	if err := yaml.Unmarshal(content, &app); err != nil {
 		panic(err)
 	}
-	app.db = datastore.New(structs.Map(app))
 	return app
 
 }
@@ -64,14 +65,12 @@ func (app *Application) Run() {
 			panic(err)
 		}
 	}
-
-	if app.Daemon == "watcher" {
-		server := transport.NewServer(app.db)
-		fmt.Println("server is starting...")
-		err := server.Start()
-		if err != nil {
-			log.Error().Err(err).Msg("Server hasn't been started.")
-			os.Exit(1)
-		}
+	daemon := daemons.New(structs.Map(app))
+	if daemon != nil {
+		daemon.Run()
 	}
+}
+
+func (app *Application) Logger() *zerolog.Logger {
+	return app.logger.Logger()
 }

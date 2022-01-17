@@ -14,6 +14,7 @@ func main() {
 	flag.BoolVar(&cfg.MigrateUp, "migrate", false, "Start with migrate up")
 	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debug mode")
 	flag.Parse()
+
 	app := application.New(cfg)
 	app.Run()
 }

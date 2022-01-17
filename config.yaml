@@ -10,16 +10,19 @@ database:
 
 daemons:
   watcher:
+    enabled: true
     memory-limit: 33554432
     sleep: 5
     threads:
       - name: import
         enabled: true
   import:
+    enabled: true
     memory-limit: 33554432
     sleep: 5
     params:
       client:
+        type: http
         host: ${EXCHANGE_HOST}
         username: ${EXCHANGE_USER}
         password: ${EXCHANGE_PASSWORD}

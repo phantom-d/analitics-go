@@ -19,12 +19,11 @@ type Datastore struct {
 
 func New(cfg map[string]interface{}) *sql.DB {
 	ds := &Datastore{config: cfg["Database"].(map[string]interface{})}
-	name := ds.config["type"].(string)
-	args := make(map[string]interface{}, 0)
-	args["arg0"] = cfg["Debug"].(bool)
-	result := DynamicCall(ds, strings.Title(strings.ToLower(name))+"Connect", args)
-	value := reflect.ValueOf(result[0]).Interface().(*sql.DB)
-	return value
+	switch strings.ToLower(ds.config["type"].(string)) {
+	case "clickhouse":
+		return ds.ClickhouseConnect(cfg["Debug"].(bool))
+	}
+	return nil
 }
 
 func MigrateUp(db *sql.DB) error {

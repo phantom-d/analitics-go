@@ -12,6 +12,6 @@ type ProductPrice struct {
 	Prices      []Price `json:"prices"`
 }
 
-func (thread *Thread) ProductPrice() {
+func (th *Thread) ProductPrice() {
 
 }
