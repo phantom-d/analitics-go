@@ -1,19 +1,12 @@
 package daemons
 
-import (
-	"analitics/pkg/transport"
-	"fmt"
-	"github.com/rs/zerolog/log"
-	"os"
-)
-
-func (d Daemon) WatcherRun() {
-	server := transport.NewServer(d.db)
-	fmt.Println("server is starting...")
-	err := server.Start()
-	if err != nil {
-		log.Error().Err(err).Msg("Server hasn't been started.")
-		os.Exit(1)
+func (d *Daemon) WatcherRun(app map[string]interface{}) {
+	if threads, ok := d.Config["Threads"].([]interface{}); ok {
+		for _, thread := range threads {
+			name := thread.(map[string]interface{})["Name"].(string)
+			cfg := app["Daemons"].(map[string]interface{})[name].(map[string]interface{})
+			daemon := New(name, cfg, d.Debug)
+			daemon.Run(app)
+		}
 	}
-
 }

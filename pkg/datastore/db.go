@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/golang-migrate/migrate/v4"
 	"os"
-	"reflect"
 	"strings"
 
 	mclickhouse "github.com/golang-migrate/migrate/v4/database/clickhouse"
@@ -39,13 +38,4 @@ func MigrateUp(db *sql.DB) error {
 		return err
 	}
 	return m.Up()
-}
-
-func DynamicCall(obj interface{}, fn string, args map[string]interface{}) (res []reflect.Value) {
-	method := reflect.ValueOf(obj).MethodByName(fn)
-	var inputs []reflect.Value
-	for _, v := range args {
-		inputs = append(inputs, reflect.ValueOf(v))
-	}
-	return method.Call(inputs)
 }

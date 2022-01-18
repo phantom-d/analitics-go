@@ -4,7 +4,6 @@ import (
 	"analitics/pkg/logger"
 	"database/sql"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"reflect"
 	"strings"
 )
@@ -12,40 +11,34 @@ import (
 type Daemon struct {
 	Name   string
 	Config map[string]interface{}
+	Debug  bool
 	Params map[string]interface{}
+	Sleep  int64
 	db     *sql.DB
 	logger *logger.Logger
 }
 
-func New(app map[string]interface{}) *Daemon {
-	d := &Daemon{}
-	d.logger = logger.New(app["Debug"].(bool))
-	name := app["Daemon"].(string)
-	if daemon, ok := app["Daemons"].(map[string]interface{})[name].(map[string]interface{}); ok {
-		if daemon["Enabled"].(bool) {
+func New(name string, cfg map[string]interface{}, debug bool) *Daemon {
+	d := &Daemon{Debug: debug}
+	d.logger = logger.New(debug)
+	if cfg != nil {
+		if cfg["Enabled"].(bool) {
 			d.Name = name
-			d.Config = daemon
-			if params, ok := daemon["Params"].(map[string]interface{}); ok {
+			d.Config = cfg
+			if sleep, ok := cfg["Sleep"].(int64); ok {
+				d.Sleep = sleep
+			}
+			if params, ok := cfg["Params"].(map[string]interface{}); ok {
 				d.Params = params
 			}
 			return d
 		} else {
-			log.Info().Msgf("Daemon '%s' is disabled!", name)
+			d.Logger().Info().Msgf("Daemon '%s' is disabled!", name)
 		}
 	} else {
-		log.Info().Msgf("Daemon '%s' not found!", name)
+		d.Logger().Info().Msgf("Daemon '%s' not found!", name)
 	}
 	return nil
-}
-
-func (d *Daemon) Run() {
-	d.Logger().Info().Msgf("Start daemon '%s'!", d.Name)
-	args := make(map[string]interface{}, 0)
-	DynamicCall(d, strings.Title(strings.ToLower(d.Name))+"Run", args)
-}
-
-func (d *Daemon) Logger() *zerolog.Logger {
-	return d.logger.Logger()
 }
 
 func DynamicCall(obj interface{}, fn string, args map[string]interface{}) (res []reflect.Value) {
@@ -55,4 +48,19 @@ func DynamicCall(obj interface{}, fn string, args map[string]interface{}) (res [
 		inputs = append(inputs, reflect.ValueOf(v))
 	}
 	return method.Call(inputs)
+}
+
+func (d *Daemon) Logger() *zerolog.Logger {
+	return d.logger.Logger()
+}
+
+func (d *Daemon) Run(app map[string]interface{}) {
+	d.Logger().Info().Msgf("Start daemon '%s'!", d.Name)
+	args := make(map[string]interface{}, 0)
+	args["arg0"] = app
+	DynamicCall(d, strings.Title(strings.ToLower(d.Name))+"Run", args)
+}
+
+func (d *Daemon) Fork(app map[string]interface{}) {
+
 }
