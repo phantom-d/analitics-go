@@ -1,0 +1,40 @@
+package daemons
+
+import (
+	"analitics/pkg/config"
+	"strings"
+)
+
+type Daemon struct {
+	Name        string
+	MemoryLimit int64
+	Workers     []config.Worker
+	Params      map[string]interface{}
+	Sleep       int64
+}
+
+func New(name string) *Daemon {
+	d := &Daemon{}
+	if cfg, ok := config.Application.Daemons[name]; ok {
+		if cfg.Enabled {
+			d.Name = name
+			d.MemoryLimit = cfg.MemoryLimit
+			d.Workers = cfg.Workers
+			d.Params = cfg.Params
+			d.Sleep = cfg.Sleep
+			return d
+		} else {
+			config.Logger.Info().Msgf("Daemon '%s' is disabled!", name)
+		}
+	} else {
+		config.Logger.Info().Msgf("Daemon '%s' not found!", name)
+	}
+	return nil
+}
+
+func (d *Daemon) Run() {
+	funcName := strings.Title(strings.ToLower(d.Name)) + "Run"
+	config.Logger.Info().Msgf("Start daemon '%s'!", d.Name)
+	args := make(map[string]interface{}, 0)
+	config.DynamicCall(d, funcName, args)
+}

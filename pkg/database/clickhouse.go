@@ -1,6 +1,7 @@
-package datastore
+package database
 
 import (
+	"analitics/pkg/config"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
@@ -12,7 +13,7 @@ import (
 	"strconv"
 )
 
-func (ds *Datastore) ClickhouseConnect(debug bool) *sql.DB {
+func (ds *Datastore) ClickhouseConnect() *sql.DB {
 	dsn := "tcp://" + ds.config["host"].(string)
 	dsn += ":" + strconv.Itoa(ds.config["port"].(int))
 	dsn += "?compress=true"
@@ -33,23 +34,23 @@ func (ds *Datastore) ClickhouseConnect(debug bool) *sql.DB {
 			}
 			caCertPool := x509.NewCertPool()
 			caCertPool.AppendCertsFromPEM(caCert)
-			config := &tls.Config{RootCAs: caCertPool}
 
-			if err := clickhouse.RegisterTLSConfig(certPath, config); err != nil {
+			if err := clickhouse.RegisterTLSConfig(certPath, &tls.Config{RootCAs: caCertPool}); err != nil {
 				log.Fatalf("Couldn't register tls config: %s", err)
 			}
 			dsn += "&secure=true&tls_config=" + certPath
 		}
 	}
 
-	if debug {
+	if config.Application.Debug {
 		dsn += "&debug=true"
 	}
 
 	connect, err := sql.Open("clickhouse", dsn)
 	if err != nil {
-		log.Fatal(err)
+		config.Logger.Fatal().Err(err).Msg("Error connection to clickhouse")
 	}
+	defer connect.Close()
 	if err := connect.Ping(); err != nil {
 		if exception, ok := err.(*clickhouse.Exception); ok {
 			fmt.Printf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)

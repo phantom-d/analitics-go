@@ -1,19 +1,22 @@
 package transport
 
 import (
+	"analitics/pkg/config"
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"time"
 )
 
 type Package struct {
-	PackageID int64    `json:"package_id"`
-	Data      []string `json:"data"`
+	PackageID int64                    `json:"package_id"`
+	Data      []map[string]interface{} `json:"data"`
+	Name      string                   `json:"name"`
+	Message   string                   `json:"message"`
 }
 
 type ErrorItems struct {
@@ -45,15 +48,15 @@ type Client struct {
 
 func NewClient(cfg map[string]interface{}) *Client {
 	c := &Client{}
-	if host, ok := cfg["Host"].(string); ok {
+	if host, ok := cfg["host"].(string); ok {
 		c.Host = host
 	} else {
-		Logger().Error().Msg("Error: Not defined host for http client!")
+		config.Logger.Error().Msg("Error: Not defined host for http client!")
 		return nil
 	}
-	if user, ok := cfg["User"].(string); ok {
+	if user, ok := cfg["username"].(string); ok {
 		c.User = user
-		if password, ok := cfg["Pass"].(string); ok {
+		if password, ok := cfg["password"].(string); ok {
 			c.Password = password
 		}
 	}
@@ -66,13 +69,25 @@ func NewClient(cfg map[string]interface{}) *Client {
 }
 
 func (c *Client) GetEntities(queue string) *Package {
+	p := new(Package)
 	uri := "entities/" + queue
-	resp, err := c.SendRequest(uri, "GET", nil)
+	body, err := c.SendRequest(uri, "GET", nil)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
+		config.Logger.Error().Err(err).Msg("")
 		return nil
 	}
-	return resp
+	if string(body) == "[]" {
+		p = nil
+	} else {
+		err = json.Unmarshal(body, &p)
+		if err != nil || p.Name != "" {
+			if err == nil {
+				err = errors.New(p.Message)
+			}
+			config.Logger.Error().Err(err).Msg("")
+		}
+	}
+	return p
 }
 
 func (c *Client) ConfirmPackage(queue string, packageID int64) {
@@ -83,11 +98,11 @@ func (c *Client) ConfirmPackage(queue string, packageID int64) {
 	}
 	data, err := json.Marshal(formData)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
+		config.Logger.Error().Err(err).Msg("")
 	}
 	_, err = c.SendRequest(uri, "POST", data)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
+		config.Logger.Error().Err(err).Msg("")
 	}
 }
 
@@ -103,7 +118,7 @@ func (c *Client) ResendErrorItems(entityType string, entityIDs []string) bool {
 	}
 	sign, err := json.Marshal(errorItemsData)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
+		config.Logger.Error().Err(err).Msg("")
 		return false
 	}
 
@@ -116,37 +131,25 @@ func (c *Client) ResendErrorItems(entityType string, entityIDs []string) bool {
 
 	data, err := json.Marshal(formData)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
+		config.Logger.Error().Err(err).Msg("")
 		return false
 	}
 	_, err = c.SendRequest(uri, "POST", data)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
+		config.Logger.Error().Err(err).Msg("")
 		return false
 	}
 	return true
 }
 
-func (c *Client) SendRequest(uri string, method string, formData []byte) (*Package, error) {
-	p := &Package{}
+func (c *Client) SendRequest(uri string, method string, formData []byte) ([]byte, error) {
 	url := c.Host + "/" + uri + "/"
 	if method == "" {
 		method = "GET"
 	}
-	content, err := ioutil.ReadFile("test.json")
-	if err != nil {
-		Logger().Error().Err(err).Msg("")
-		return nil, err
-	}
-	content = []byte(os.ExpandEnv(string(content)))
-	if err := json.Unmarshal(content, &p); err != nil {
-		Logger().Error().Err(err).Msg("")
-		return nil, err
-	}
 
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(formData))
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
 		return nil, err
 	}
 
@@ -159,21 +162,13 @@ func (c *Client) SendRequest(uri string, method string, formData []byte) (*Packa
 
 	resp, err := c.conn.Do(req)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		Logger().Error().Err(err).Msg("")
 		return nil, err
 	}
-
-	err = json.Unmarshal(body, &p)
-	if err != nil {
-		Logger().Error().Err(err).Msg("")
-		return nil, err
-	}
-	return p, nil
+	return body, nil
 }

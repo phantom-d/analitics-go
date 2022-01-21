@@ -39,6 +39,7 @@ require (
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/keybase/go-ps v0.0.0-20190827175125-91aafc93ba19 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/shirou/gopsutil/v3 v3.21.9 // indirect

@@ -13,13 +13,13 @@ daemons:
     enabled: true
     memory-limit: 33554432
     sleep: 5
-    threads:
+    workers:
       - name: status
         enabled: true
       - name: import
         enabled: true
   status:
-    enabled: true
+    enabled: false
     memory-limit: 33554432
   import:
     enabled: true
@@ -31,8 +31,8 @@ daemons:
         host: ${EXCHANGE_HOST}
         username: ${EXCHANGE_USER}
         password: ${EXCHANGE_PASSWORD}
-    threads:
+    workers:
       - enabled: true
-        name: productPrice
+        name: ProductPrice
         queue: product-price
         sleep: 60
