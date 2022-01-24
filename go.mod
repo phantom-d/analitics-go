@@ -18,6 +18,7 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
+	github.com/ghetzel/go-stockutil v1.10.3 // indirect
 	github.com/go-ole/go-ole v1.2.6-0.20210915003542-8b1f7f90f6b1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gops v0.3.22 // indirect

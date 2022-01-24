@@ -4,6 +4,7 @@ import (
 	"analitics/pkg/config"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"github.com/rs/zerolog"
 )
 
 type ProductPrice struct {
@@ -18,18 +19,31 @@ type ProductPrices struct {
 	Prices      []ProductPrice `mapstructure:"prices"`
 }
 
-func (w *Worker) ProductPriceRun(data []map[string]interface{}) {
-	for _, row := range data {
-		item := ProductPrices{}
-		err := mapstructure.Decode(row, &item)
-		if err != nil {
-			config.Logger.Error().Err(err).Msg("")
-			continue
-		}
-		w.productPriceSave(item)
+func (w *Worker) ProductPriceSave(row map[string]interface{}) (result interface{}, err error) {
+	item := ProductPrices{}
+	err = mapstructure.Decode(row, &item)
+	if err != nil {
+		config.Logger.Error().Err(err).Msg("")
+		return
 	}
+	// TODO: Добавить обработку данных очереди
+	config.Logger.Info().
+		Dict("message_json", zerolog.Dict().
+			Str("queue", w.Queue),
+		).
+		Msg(fmt.Sprintf("%+v", item))
+	return
 }
 
-func (w *Worker) productPriceSave(item ProductPrices) {
-	fmt.Println(item)
+func (w *Worker) ProductPriceExtractId(items []map[string]interface{}) (result []string, err error) {
+	for _, row := range items {
+		item := ProductPrices{}
+		err = mapstructure.Decode(row, &item)
+		if err != nil {
+			config.Logger.Error().Err(err).Msg("")
+			return
+		}
+		result = append(result, item.ProductGuid)
+	}
+	return
 }

@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/mitchellh/mapstructure"
+	"github.com/rs/zerolog"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -40,27 +43,19 @@ type Confirm struct {
 }
 
 type Client struct {
-	Host     string
-	User     string
-	Password string
-	conn     *http.Client
+	Host      string `mapstructure:"host"`
+	User      string `mapstructure:"username"`
+	Password  string `mapstructure:"password"`
+	UserAgent string `mapstructure:"user-agent"`
+	conn      *http.Client
 }
 
 func NewClient(cfg map[string]interface{}) *Client {
 	c := &Client{}
-	if host, ok := cfg["host"].(string); ok {
-		c.Host = host
-	} else {
-		config.Logger.Error().Msg("Error: Not defined host for http client!")
-		return nil
+	err := mapstructure.Decode(cfg, &c)
+	if err != nil {
+		config.Logger.Fatal().Err(err).Msg("Error initialisation HTTP Client!")
 	}
-	if user, ok := cfg["username"].(string); ok {
-		c.User = user
-		if password, ok := cfg["password"].(string); ok {
-			c.Password = password
-		}
-	}
-
 	c.conn = &http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -68,17 +63,15 @@ func NewClient(cfg map[string]interface{}) *Client {
 	return c
 }
 
-func (c *Client) GetEntities(queue string) *Package {
+func (c *Client) GetEntities(queue string) (result *Package, err error) {
 	p := new(Package)
 	uri := "entities/" + queue
 	body, err := c.SendRequest(uri, "GET", nil)
 	if err != nil {
 		config.Logger.Error().Err(err).Msg("")
-		return nil
+		return
 	}
-	if string(body) == "[]" {
-		p = nil
-	} else {
+	if string(body) != "[]" {
 		err = json.Unmarshal(body, &p)
 		if err != nil || p.Name != "" {
 			if err == nil {
@@ -87,11 +80,12 @@ func (c *Client) GetEntities(queue string) *Package {
 			config.Logger.Error().Err(err).Msg("")
 		}
 	}
-	return p
+	result = p
+	return
 }
 
 func (c *Client) ConfirmPackage(queue string, packageID int64) {
-	uri := "confirm-package" + queue
+	uri := "confirm-package"
 	formData := Confirm{
 		PackageID: packageID,
 		Type:      queue,
@@ -154,7 +148,8 @@ func (c *Client) SendRequest(uri string, method string, formData []byte) ([]byte
 	}
 
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("User-Agent", "Analitics Exchange")
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("User-Agent", c.UserAgent)
 
 	if c.User != "" && c.Password != "" {
 		req.SetBasicAuth(c.User, c.Password)
@@ -169,6 +164,14 @@ func (c *Client) SendRequest(uri string, method string, formData []byte) ([]byte
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+	if config.Application.Debug {
+		config.Logger.Debug().
+			Dict("data", zerolog.Dict().
+				Str("request", spew.Sdump(req)).
+				Str("body", string(body)),
+			).
+			Msg("Response body")
 	}
 	return body, nil
 }

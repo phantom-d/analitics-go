@@ -50,7 +50,6 @@ func (ds *Datastore) ClickhouseConnect() *sql.DB {
 	if err != nil {
 		config.Logger.Fatal().Err(err).Msg("Error connection to clickhouse")
 	}
-	defer connect.Close()
 	if err := connect.Ping(); err != nil {
 		if exception, ok := err.(*clickhouse.Exception); ok {
 			fmt.Printf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
