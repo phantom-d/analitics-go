@@ -3,6 +3,7 @@ package workers
 import (
 	"analitics/pkg/config"
 	"analitics/pkg/database"
+	"analitics/pkg/transport"
 	"strings"
 )
 
@@ -23,11 +24,43 @@ func New(cfg config.Worker) *Worker {
 	return nil
 }
 
-func (w *Worker) Run(data []map[string]interface{}) {
+func (w *Worker) BeforeRun() (interface{}, error) {
+	return config.RequestFunc(w, strings.Title(w.Name), 3)
+}
+
+func (w *Worker) AfterRun() (interface{}, error) {
+	return config.RequestFunc(w, strings.Title(w.Name), 3)
+}
+
+func (w *Worker) BeforeIteration(data []map[string]interface{}) (interface{}, error) {
+	return config.RequestFunc(w, strings.Title(w.Name), 3, data)
+}
+
+func (w *Worker) AfterIteration(errorItems []map[string]interface{}) (interface{}, error) {
+	return config.RequestFunc(w, strings.Title(w.Name), 3, errorItems)
+}
+
+func (w *Worker) ExtractId(errorItems []map[string]interface{}) (result []string, err error) {
+	resp, err := config.RequestFunc(w, strings.Title(w.Name), 3, errorItems)
+	if resp != nil {
+		result = resp.([]string)
+	}
+	return
+}
+
+func (w *Worker) Save(importData map[string]interface{}) (interface{}, error) {
 	database.Reconnect()
-	config.Logger.Info().Msgf("Start worker '%s'!", w.Name)
-	funcName := strings.Title(w.Name) + "Run"
-	args := make(map[string]interface{}, 0)
-	args["arg0"] = data
-	config.DynamicCall(w, funcName, args)
+	return config.RequestFunc(w, strings.Title(w.Name), 3, importData)
+}
+
+func (w *Worker) AddToQueue(params map[string]interface{}, errorItems []map[string]interface{}) bool {
+	result := true
+	items, _ := w.ExtractId(errorItems)
+
+	if items != nil {
+		tr := transport.New(params)
+		result = tr.Client.ResendErrorItems(w.Queue, items)
+	}
+
+	return result
 }

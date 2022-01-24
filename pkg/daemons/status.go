@@ -14,5 +14,4 @@ func (d *Daemon) StatusRun() {
 		config.Logger.Error().Err(err).Msg("Server hasn't been started!")
 		os.Exit(1)
 	}
-
 }

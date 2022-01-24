@@ -33,8 +33,6 @@ func New(name string) *Daemon {
 }
 
 func (d *Daemon) Run() {
-	funcName := strings.Title(strings.ToLower(d.Name)) + "Run"
 	config.Logger.Info().Msgf("Start daemon '%s'!", d.Name)
-	args := make(map[string]interface{}, 0)
-	config.DynamicCall(d, funcName, args)
+	_, _ = config.RequestFunc(d, strings.Title(d.Name), 3)
 }
