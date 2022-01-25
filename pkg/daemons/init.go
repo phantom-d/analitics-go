@@ -36,3 +36,7 @@ func (d *Daemon) Run() {
 	config.Logger.Info().Msgf("Start daemon '%s'!", d.Name)
 	_, _ = config.RequestFunc(d, strings.Title(d.Name), 3)
 }
+
+func (d *Daemon) Fork() {
+
+}

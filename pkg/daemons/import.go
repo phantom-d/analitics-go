@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog"
+	"sync"
 	"time"
 )
 
@@ -67,15 +68,24 @@ func (d *Daemon) importProcess(w *workers.Worker) {
 			}
 			if data != nil {
 				result.Total = len(data.Data)
+				var wg sync.WaitGroup
+				var mu sync.Mutex
 				for _, item := range data.Data {
 					if config.Application.Debug {
 						config.Logger.Debug().Msg(spew.Sdump(item))
 					}
-					_, err := w.Save(item)
-					if err != nil {
-						result.ErrorItems = append(result.ErrorItems, item)
-					}
+					wg.Add(1)
+					go func(item map[string]interface{}) {
+						defer wg.Done()
+						_, err := w.Save(item)
+						if err != nil {
+							mu.Lock()
+							result.ErrorItems = append(result.ErrorItems, item)
+							mu.Unlock()
+						}
+					}(item)
 				}
+				wg.Wait()
 			}
 			result.Duration = time.Now().Sub(timeStart)
 			err = d.importConfirm(w, result)
