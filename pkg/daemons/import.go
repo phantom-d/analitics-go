@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/mitchellh/mapstructure"
 	"github.com/rs/zerolog"
 	"sync"
 	"time"
@@ -77,7 +78,13 @@ func (d *Daemon) importProcess(w *workers.Worker) {
 					wg.Add(1)
 					go func(item map[string]interface{}) {
 						defer wg.Done()
-						_, err := w.Save(item)
+						database.Reconnect()
+						err = mapstructure.Decode(item, &w.Job)
+						if err != nil {
+							config.Logger.Error().Err(err).Msg("")
+							return
+						}
+						_, err := w.Job.Save()
 						if err != nil {
 							mu.Lock()
 							result.ErrorItems = append(result.ErrorItems, item)

@@ -2,9 +2,7 @@ package workers
 
 import (
 	"analitics/pkg/config"
-	"fmt"
 	"github.com/mitchellh/mapstructure"
-	"github.com/rs/zerolog"
 )
 
 type ProductPrice struct {
@@ -19,31 +17,29 @@ type ProductPrices struct {
 	Prices      []ProductPrice `mapstructure:"prices"`
 }
 
-func (w *Worker) ProductPriceSave(row map[string]interface{}) (result interface{}, err error) {
-	item := ProductPrices{}
-	err = mapstructure.Decode(row, &item)
-	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
-		return
-	}
+func (pp *ProductPrices) Save() (result interface{}, err error) {
 	// TODO: Добавить обработку данных очереди
-	config.Logger.Info().
-		Dict("message_json", zerolog.Dict().
-			Str("queue", w.Queue),
-		).
-		Msg(fmt.Sprintf("%+v", item))
+	for _, price := range pp.Prices {
+		if pp.checkExist(price) {
+
+		}
+	}
 	return
 }
 
-func (w *Worker) ProductPriceExtractId(items []map[string]interface{}) (result []string, err error) {
+func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []string, err error) {
 	for _, row := range items {
 		item := ProductPrices{}
 		err = mapstructure.Decode(row, &item)
 		if err != nil {
 			config.Logger.Error().Err(err).Msg("")
-			return
+			continue
 		}
 		result = append(result, item.ProductGuid)
 	}
+	return
+}
+
+func (pp *ProductPrices) checkExist(price ProductPrice) (result bool) {
 	return
 }

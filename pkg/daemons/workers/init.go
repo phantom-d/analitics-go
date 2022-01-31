@@ -2,9 +2,7 @@ package workers
 
 import (
 	"analitics/pkg/config"
-	"analitics/pkg/database"
 	"analitics/pkg/transport"
-	"strings"
 )
 
 type Worker struct {
@@ -12,11 +10,39 @@ type Worker struct {
 	Queue   string
 	Enabled bool
 	Sleep   int64
+	Job     Job
+}
+
+type Job interface {
+	Save() (result interface{}, err error)
+	ExtractId([]map[string]interface{}) (result []string, err error)
+}
+
+type Factory map[string]func() Job
+
+func (factory *Factory) Register(name string, factoryFunc func() Job) {
+	(*factory)[name] = factoryFunc
+}
+
+func (factory *Factory) CreateInstance(name string) Job {
+	return (*factory)[name]()
+}
+
+var factory = make(Factory)
+
+func init() {
+	factory.Register("ProductPrices", func() Job { return &ProductPrices{} })
 }
 
 func New(cfg config.Worker) *Worker {
 	if cfg.Enabled {
-		worker := &Worker{cfg.Name, cfg.Queue, cfg.Enabled, cfg.Sleep}
+		worker := &Worker{
+			Name:    cfg.Name,
+			Queue:   cfg.Queue,
+			Enabled: cfg.Enabled,
+			Sleep:   cfg.Sleep,
+			Job:     factory.CreateInstance(cfg.Name),
+		}
 		return worker
 	} else {
 		config.Logger.Info().Msgf("Worker '%s' is disabled!", cfg.Name)
@@ -25,37 +51,24 @@ func New(cfg config.Worker) *Worker {
 }
 
 func (w *Worker) BeforeRun() (interface{}, error) {
-	return config.RequestFunc(w, strings.Title(w.Name), 3)
+	return config.DynamicCall(w.Job, "BeforeRun")
 }
 
 func (w *Worker) AfterRun() (interface{}, error) {
-	return config.RequestFunc(w, strings.Title(w.Name), 3)
+	return config.DynamicCall(w.Job, "AfterRun")
 }
 
 func (w *Worker) BeforeIteration(data []map[string]interface{}) (interface{}, error) {
-	return config.RequestFunc(w, strings.Title(w.Name), 3, data)
+	return config.DynamicCall(w.Job, "BeforeIteration", data)
 }
 
 func (w *Worker) AfterIteration(errorItems []map[string]interface{}) (interface{}, error) {
-	return config.RequestFunc(w, strings.Title(w.Name), 3, errorItems)
-}
-
-func (w *Worker) ExtractId(errorItems []map[string]interface{}) (result []string, err error) {
-	resp, err := config.RequestFunc(w, strings.Title(w.Name), 3, errorItems)
-	if resp != nil {
-		result = resp.([]string)
-	}
-	return
-}
-
-func (w *Worker) Save(importData map[string]interface{}) (interface{}, error) {
-	database.Reconnect()
-	return config.RequestFunc(w, strings.Title(w.Name), 3, importData)
+	return config.DynamicCall(w.Job, "AfterIteration", errorItems)
 }
 
 func (w *Worker) AddToQueue(params map[string]interface{}, errorItems []map[string]interface{}) bool {
 	result := true
-	items, _ := w.ExtractId(errorItems)
+	items, _ := w.Job.ExtractId(errorItems)
 
 	if items != nil {
 		tr := transport.New(params)

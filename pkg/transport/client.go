@@ -16,10 +16,10 @@ import (
 )
 
 type Package struct {
-	PackageID int64                    `json:"package_id"`
-	Data      []map[string]interface{} `json:"data"`
-	Name      string                   `json:"name"`
-	Message   string                   `json:"message"`
+	PackageID int64                    `json:"package_id,omitempty"`
+	Data      []map[string]interface{} `json:"data,omitempty"`
+	Name      string                   `json:"name,omitempty"`
+	Message   *string                  `json:"message,omitempty"`
 }
 
 type ErrorItems struct {
@@ -73,10 +73,11 @@ func (c *Client) GetEntities(queue string) (result *Package, err error) {
 	}
 	if string(body) != "[]" {
 		err = json.Unmarshal(body, &p)
-		if err != nil || p.Name != "" {
-			if err == nil {
-				err = errors.New(p.Message)
-			}
+		if err != nil {
+			config.Logger.Error().Err(err).Msg("")
+		}
+		if p.Message != nil {
+			err = errors.New(*p.Message)
 			config.Logger.Error().Err(err).Msg("")
 		}
 	}

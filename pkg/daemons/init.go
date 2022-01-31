@@ -34,7 +34,7 @@ func New(name string) *Daemon {
 
 func (d *Daemon) Run() {
 	config.Logger.Info().Msgf("Start daemon '%s'!", d.Name)
-	_, _ = config.RequestFunc(d, strings.Title(d.Name), 3)
+	_, _ = config.DynamicCall(d, strings.Title(d.Name)+"Run")
 }
 
 func (d *Daemon) Fork() {
