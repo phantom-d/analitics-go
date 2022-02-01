@@ -6,7 +6,15 @@ import (
 	"os"
 )
 
-func (d *Daemon) StatusRun() {
+type Status struct {
+	*DaemonData
+}
+
+func (st *Status) SetData(data *DaemonData) {
+	st.DaemonData = data
+}
+
+func (st *Status) Run() {
 	server := transport.NewServer()
 	config.Logger.Info().Msg("Http server is starting...")
 	err := server.Start()

@@ -1,10 +1,28 @@
 package daemons
 
-func (d *Daemon) WatcherRun() {
-	for _, cfg := range d.Workers {
-		daemon := New(cfg.Name)
-		if daemon != nil {
-			daemon.Run()
+import (
+	"analitics/pkg/config"
+	"time"
+)
+
+type Watcher struct {
+	*DaemonData
+}
+
+func (watcher *Watcher) SetData(data *DaemonData) {
+	watcher.DaemonData = data
+}
+
+func (watcher *Watcher) Run() {
+	config.Logger.Info().Msgf("Start daemon '%s'!", watcher.Name)
+	for {
+		for _, cfg := range watcher.Workers {
+			daemon := New(cfg.Name)
+			if daemon != nil {
+				config.Logger.Info().Msgf("Start daemon '%s'!", cfg.Name)
+				daemon.Run()
+			}
 		}
+		time.Sleep(time.Duration(watcher.Sleep) * time.Second)
 	}
 }

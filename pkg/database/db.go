@@ -65,3 +65,11 @@ func (ds *Datastore) MigrateUp() error {
 	}
 	return m.Up()
 }
+
+func (ds *Datastore) Connect() (result *sql.DB) {
+	if err := Storage.connect.Ping(); err != nil {
+		Reconnect()
+	}
+	result = Storage.connect
+	return
+}

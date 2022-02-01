@@ -21,6 +21,7 @@ type Config struct {
 }
 
 type Daemon struct {
+	Name        string                 `yaml:"name"`
 	Enabled     bool                   `yaml:"enabled"`
 	MemoryLimit int64                  `yaml:"memory-limit"`
 	Sleep       int64                  `yaml:"sleep"`

@@ -31,16 +31,24 @@ type resultLog struct {
 	Errors            int     `json:"errors"`
 }
 
-func (d *Daemon) ImportRun() {
+type Import struct {
+	*DaemonData
+}
+
+func (imp *Import) SetData(data *DaemonData) {
+	imp.DaemonData = data
+}
+
+func (imp *Import) Run() {
 	for {
-		for _, cfg := range d.Workers {
+		for _, cfg := range imp.Workers {
 			worker := workers.New(cfg)
 			if worker != nil {
 				_, err := worker.BeforeRun()
 				if err != nil {
 					config.Logger.Error().Err(err).Msg("")
 				}
-				d.importProcess(worker)
+				imp.Process(worker)
 				database.Reconnect()
 				_, err = worker.AfterRun()
 				if err != nil {
@@ -48,17 +56,17 @@ func (d *Daemon) ImportRun() {
 				}
 			}
 		}
-		time.Sleep(time.Duration(d.Sleep) * time.Second)
+		time.Sleep(time.Duration(imp.Sleep) * time.Second)
 	}
 }
 
-func (d *Daemon) importProcess(w *workers.Worker) {
+func (imp *Import) Process(w *workers.Worker) {
 	config.Logger.Info().Msgf("Start worker '%s'!", w.Name)
 	// TODO: Добавить обработку сигналов и превышения памяти
 	for {
 		timeStart := time.Now()
 		database.Reconnect()
-		tr := transport.New(d.Params)
+		tr := transport.New(imp.Params)
 		data, errorData := tr.Client.GetEntities(w.Queue)
 		result := resultProcess{Queue: w.Queue}
 		for errorData == nil && len(data.Data) > 0 {
@@ -95,7 +103,7 @@ func (d *Daemon) importProcess(w *workers.Worker) {
 				wg.Wait()
 			}
 			result.Duration = time.Now().Sub(timeStart)
-			err = d.importConfirm(w, result)
+			err = imp.Confirm(w, result)
 			if err != nil {
 				config.Logger.Error().Err(err).Msg("")
 			}
@@ -110,7 +118,7 @@ func (d *Daemon) importProcess(w *workers.Worker) {
 		if errorData != nil || len(data.Data) == 0 {
 			result = resultProcess{Queue: w.Queue}
 			result.Duration = time.Now().Sub(timeStart)
-			err := d.importConfirm(w, result)
+			err := imp.Confirm(w, result)
 			if err != nil {
 				config.Logger.Error().Err(err).Msg("")
 			}
@@ -119,11 +127,11 @@ func (d *Daemon) importProcess(w *workers.Worker) {
 	}
 }
 
-func (d Daemon) importConfirm(w *workers.Worker, data resultProcess) (err error) {
+func (imp *Import) Confirm(w *workers.Worker, data resultProcess) (err error) {
 	errorCount := len(data.ErrorItems)
 	if data.PackageID > 0 {
-		if errorCount == 0 || (data.Total > errorCount && w.AddToQueue(d.Params, data.ErrorItems)) {
-			tr := transport.New(d.Params)
+		if errorCount == 0 || (data.Total > errorCount && w.AddToQueue(imp.Params, data.ErrorItems)) {
+			tr := transport.New(imp.Params)
 			tr.Client.ConfirmPackage(data.Queue, data.PackageID)
 		}
 	}
