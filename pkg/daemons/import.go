@@ -7,10 +7,8 @@ import (
 	"analitics/pkg/transport"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/mitchellh/mapstructure"
 	"github.com/rs/zerolog"
-	"sync"
 	"time"
 )
 
@@ -49,7 +47,6 @@ func (imp *Import) Run() {
 					config.Logger.Error().Err(err).Msg("")
 				}
 				imp.Process(worker)
-				database.Reconnect()
 				_, err = worker.AfterRun()
 				if err != nil {
 					config.Logger.Error().Err(err).Msg("")
@@ -62,10 +59,10 @@ func (imp *Import) Run() {
 
 func (imp *Import) Process(w *workers.Worker) {
 	config.Logger.Info().Msgf("Start worker '%s'!", w.Name)
-	// TODO: Добавить обработку сигналов и превышения памяти
+	db := database.New(config.Application.Database, false)
+	// TODO: Добавить запуск демонов с контролем сигналов и превышения памяти
 	for {
 		timeStart := time.Now()
-		database.Reconnect()
 		tr := transport.New(imp.Params)
 		data, errorData := tr.Client.GetEntities(w.Queue)
 		result := resultProcess{Queue: w.Queue}
@@ -77,30 +74,17 @@ func (imp *Import) Process(w *workers.Worker) {
 			}
 			if data != nil {
 				result.Total = len(data.Data)
-				var wg sync.WaitGroup
-				var mu sync.Mutex
 				for _, item := range data.Data {
-					if config.Application.Debug {
-						config.Logger.Debug().Msg(spew.Sdump(item))
+					err = mapstructure.Decode(item, &w.Job)
+					if err != nil {
+						config.Logger.Error().Err(err).Msg("")
+						return
 					}
-					wg.Add(1)
-					go func(item map[string]interface{}) {
-						defer wg.Done()
-						database.Reconnect()
-						err = mapstructure.Decode(item, &w.Job)
-						if err != nil {
-							config.Logger.Error().Err(err).Msg("")
-							return
-						}
-						_, err := w.Job.Save()
-						if err != nil {
-							mu.Lock()
-							result.ErrorItems = append(result.ErrorItems, item)
-							mu.Unlock()
-						}
-					}(item)
+					_, err := w.Job.Save(db)
+					if err != nil {
+						result.ErrorItems = append(result.ErrorItems, item)
+					}
 				}
-				wg.Wait()
 			}
 			result.Duration = time.Now().Sub(timeStart)
 			err = imp.Confirm(w, result)

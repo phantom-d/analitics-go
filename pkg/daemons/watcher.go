@@ -15,6 +15,7 @@ func (watcher *Watcher) SetData(data *DaemonData) {
 
 func (watcher *Watcher) Run() {
 	config.Logger.Info().Msgf("Start daemon '%s'!", watcher.Name)
+	// TODO: Добавить запуск демонов с контролем сигналов и превышения памяти
 	for {
 		for _, cfg := range watcher.Workers {
 			daemon := New(cfg.Name)

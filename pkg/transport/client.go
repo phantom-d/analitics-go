@@ -164,15 +164,15 @@ func (c *Client) SendRequest(uri string, method string, formData []byte) ([]byte
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		if config.Application.Debug {
+			config.Logger.Debug().
+				Dict("data", zerolog.Dict().
+					Str("request", spew.Sdump(req)).
+					Str("body", string(body)),
+				).
+				Msg("Response body")
+		}
 		return nil, err
-	}
-	if config.Application.Debug {
-		config.Logger.Debug().
-			Dict("data", zerolog.Dict().
-				Str("request", spew.Sdump(req)).
-				Str("body", string(body)),
-			).
-			Msg("Response body")
 	}
 	return body, nil
 }

@@ -2,51 +2,33 @@ package database
 
 import (
 	"analitics/pkg/config"
+
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"github.com/ClickHouse/clickhouse-go"
 	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/ClickHouse/clickhouse-go"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/clickhouse"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func (ds *Datastore) ClickhouseConnect() *sql.DB {
-	dsn := "tcp://" + ds.config["host"].(string)
-	dsn += ":" + strconv.Itoa(ds.config["port"].(int))
-	dsn += "?compress=true"
-	dsn += "&database=" + ds.config["name"].(string)
+type Clickhouse struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Name     string `mapstructure:"name"`
+	User     string `mapstructure:"user"`
+	Pass     string `mapstructure:"pass"`
+	CertPath string `mapstructure:"cert-path"`
+}
 
-	if _, ok := ds.config["user"].(string); ok {
-		dsn += "&username=" + ds.config["user"].(string)
-		if _, ok := ds.config["pass"].(string); ok {
-			dsn += "&password=" + ds.config["pass"].(string)
-		}
-	}
-
-	if certPath, ok := ds.config["cert-path"].(string); ok {
-		if _, err := os.Stat(certPath); err == nil {
-			caCert, err := ioutil.ReadFile(certPath)
-			if err != nil {
-				log.Fatalf("Couldn't load file: %s", err)
-			}
-			caCertPool := x509.NewCertPool()
-			caCertPool.AppendCertsFromPEM(caCert)
-
-			if err := clickhouse.RegisterTLSConfig(certPath, &tls.Config{RootCAs: caCertPool}); err != nil {
-				log.Fatalf("Couldn't register tls config: %s", err)
-			}
-			dsn += "&secure=true&tls_config=" + certPath
-		}
-	}
-
-	if config.Application.Debug {
-		dsn += "&debug=true"
-	}
-
-	connect, err := sql.Open("clickhouse", dsn)
+func (click *Clickhouse) Connect() *sql.DB {
+	connect, err := sql.Open("clickhouse", click.dsn("tcp"))
 	if err != nil {
 		config.Logger.Fatal().Err(err).Msg("Error connection to clickhouse")
 	}
@@ -60,4 +42,57 @@ func (ds *Datastore) ClickhouseConnect() *sql.DB {
 	}
 
 	return connect
+}
+
+func (click *Clickhouse) MigrateUp(source string) {
+	m, err := migrate.New(source, click.dsn("clickhouse"))
+	if err != nil {
+		config.Logger.Error().Err(err).Msg("Migration")
+		return
+	}
+	config.Logger.Info().Msg("Migration: start...")
+	err = m.Up()
+	if err != nil {
+		if err.Error() == "no change" {
+			config.Logger.Info().Msgf("Migration: %s!", err.Error())
+		} else {
+			config.Logger.Error().Err(err).Msg("Migration")
+		}
+	}
+	config.Logger.Info().Msg("Migration: end...")
+}
+
+func (click *Clickhouse) dsn(scheme string) (result string) {
+	result = scheme + "://" + click.Host
+	result += ":" + strconv.Itoa(click.Port)
+	result += "?compress=true&x-multi-statement=true&x-migrations-table-engine=MergeTree"
+	result += "&database=" + click.Name
+
+	if click.User != "" {
+		result += "&username=" + click.User
+		if click.Pass != "" {
+			result += "&password=" + click.Pass
+		}
+	}
+
+	if click.CertPath != "" {
+		if _, err := os.Stat(click.CertPath); err == nil {
+			caCert, err := ioutil.ReadFile(click.CertPath)
+			if err != nil {
+				log.Fatalf("Couldn't load file: %s", err)
+			}
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(caCert)
+
+			if err := clickhouse.RegisterTLSConfig(click.CertPath, &tls.Config{RootCAs: caCertPool}); err != nil {
+				log.Fatalf("Couldn't register tls config: %s", err)
+			}
+			result += "&secure=true&tls_config=" + click.CertPath
+		}
+	}
+
+	if config.Application.Debug {
+		result += "&debug=true"
+	}
+	return
 }

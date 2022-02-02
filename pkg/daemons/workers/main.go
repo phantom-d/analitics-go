@@ -2,6 +2,7 @@ package workers
 
 import (
 	"analitics/pkg/config"
+	"analitics/pkg/database"
 	"analitics/pkg/transport"
 )
 
@@ -14,7 +15,7 @@ type Worker struct {
 }
 
 type Job interface {
-	Save() (result interface{}, err error)
+	Save(db *database.Datastore) (result interface{}, err error)
 	ExtractId([]map[string]interface{}) (result []string, err error)
 }
 

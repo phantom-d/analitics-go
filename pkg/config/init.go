@@ -1,7 +1,6 @@
 package config
 
 import (
-	"database/sql"
 	goflag "flag"
 	"github.com/rs/zerolog"
 	flag "github.com/spf13/pflag"
@@ -17,7 +16,6 @@ type Config struct {
 	MigrateUp  bool
 	Database   map[string]interface{} `yaml:"database"`
 	Daemons    map[string]Daemon
-	db         *sql.DB
 }
 
 type Daemon struct {

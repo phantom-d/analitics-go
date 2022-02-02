@@ -1,0 +1,1 @@
+ALTER TABLE product_price DROP INDEX product_price_product_price_type;

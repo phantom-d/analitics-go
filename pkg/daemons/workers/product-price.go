@@ -29,11 +29,11 @@ type productPrice struct {
 	PriceTime string `mapstructure:"price_time"`
 }
 
-func (pp *ProductPrices) Save() (result interface{}, err error) {
+func (pp *ProductPrices) Save(ds *database.Datastore) (result interface{}, err error) {
 	inserts := make([][]interface{}, 0, len(pp.Prices))
 	for _, price := range pp.Prices {
 		insert := make([]interface{}, 0, 5)
-		if pp.checkExist(price) {
+		if pp.checkExist(price, ds) {
 			continue
 		}
 		timeSrc := time.Unix(price.LastUpdate, 0)
@@ -47,9 +47,8 @@ func (pp *ProductPrices) Save() (result interface{}, err error) {
 	if len(inserts) == 0 {
 		return
 	}
-	db := database.Storage.Connect()
 	query := `INSERT INTO product_price VALUES (?,?,?,?,?)`
-	tx, err := db.Begin()
+	tx, err := ds.Connect().Begin()
 	if err != nil {
 		config.Logger.Error().Err(err).Msg("begin transaction")
 		return
@@ -61,17 +60,21 @@ func (pp *ProductPrices) Save() (result interface{}, err error) {
 		}
 	}()
 	stmt, err := tx.Prepare(query)
+	if err != nil {
+		config.Logger.Error().Err(err).Msg("Prepare stmt")
+		return
+	}
 	for _, insert := range inserts {
 		_, err = stmt.Exec(insert...)
 		if err != nil {
-			config.Logger.Error().Err(err).Msg("loading COPY data")
+			config.Logger.Error().Err(err).Msg("Loading data")
 			return
 		}
 	}
 
 	err = stmt.Close()
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("close COPY stmt")
+		config.Logger.Error().Err(err).Msg("Close stmt")
 		return
 	}
 
@@ -97,20 +100,22 @@ func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []str
 	return
 }
 
-func (pp *ProductPrices) checkExist(price ProductPrice) (result bool) {
-	db := database.Storage.Connect()
+func (pp *ProductPrices) checkExist(price ProductPrice, ds *database.Datastore) (result bool) {
+	config.Logger.Debug().Msg(fmt.Sprintf("%+v", price))
 	query := `SELECT * FROM product_price WHERE product = ? AND price_type = ? ORDER BY price_time DESC LIMIT 1`
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
-	}
-	defer stmt.Close()
-
 	item := &productPrice{}
-	err = stmt.QueryRow(pp.ProductGuid, price.PriceGuid).
-		Scan(&item.Product, &item.Price, &item.PriceType, &item.PriceDate, &item.PriceTime)
-	if err != nil && err != sql.ErrNoRows {
-		config.Logger.Error().Err(err).Msg("")
+	rows, err := ds.Connect().Query(query, pp.ProductGuid, price.PriceGuid)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			config.Logger.Error().Err(err).Msg("ProductPrices.checkExist")
+		}
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(&item.Product, &item.Price, &item.PriceType, &item.PriceDate, &item.PriceTime); err != nil {
+			config.Logger.Error().Err(err).Msg("ProductPrices.checkExist")
+		}
 	}
 	if item.Product != "" {
 		timeSrc := time.Unix(price.LastUpdate, 0)
@@ -122,5 +127,6 @@ func (pp *ProductPrices) checkExist(price ProductPrice) (result bool) {
 			result = true
 		}
 	}
+	ds.Close()
 	return
 }
