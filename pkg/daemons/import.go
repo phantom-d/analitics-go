@@ -122,7 +122,7 @@ func (imp *Import) Confirm(w *workers.Worker, data resultProcess) (err error) {
 	logData := resultLog{}
 	logData.Queue = data.Queue
 	logData.Total = data.Total
-	logData.Duration = data.Duration.Seconds()
+	logData.Duration = data.Duration.Round(time.Second).Seconds()
 	logData.DurationFormatted = config.FmtDuration(data.Duration)
 	logData.Errors = errorCount
 	logData.Imported = logData.Total - logData.Errors

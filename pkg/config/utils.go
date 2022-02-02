@@ -32,7 +32,7 @@ func DynamicCall(obj interface{}, fn string, params ...interface{}) (result inte
 }
 
 func FmtDuration(d time.Duration) string {
-	d = d.Round(time.Microsecond)
+	d = d.Round(time.Second)
 	h := d / time.Hour
 	d -= h * time.Hour
 	m := d / time.Minute
