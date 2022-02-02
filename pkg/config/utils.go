@@ -3,9 +3,6 @@ package config
 import (
 	"fmt"
 	"reflect"
-	"runtime"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -35,22 +32,11 @@ func DynamicCall(obj interface{}, fn string, params ...interface{}) (result inte
 }
 
 func FmtDuration(d time.Duration) string {
-	ms := strings.Split(strconv.FormatFloat(d.Seconds(), 'f', 5, 64), ".")[1]
 	d = d.Round(time.Microsecond)
 	h := d / time.Hour
 	d -= h * time.Hour
 	m := d / time.Minute
 	d -= m * time.Minute
 	s := d / time.Second
-	return fmt.Sprintf("%02d:%02d:%02d.%s", h, m, s, ms)
-}
-
-func GetFuncCurrentName(skip int) (result string) {
-	pc := make([]uintptr, 10)
-	runtime.Callers(skip, pc)
-	f := runtime.FuncForPC(pc[0])
-	funcName := f.Name()
-	a := strings.Split(funcName, ".")
-	result = a[len(a)-1]
-	return
+	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
