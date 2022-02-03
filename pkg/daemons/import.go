@@ -39,6 +39,10 @@ func (imp *Import) SetData(data *DaemonData) {
 	imp.DaemonData = data
 }
 
+func (imp *Import) Data() *DaemonData {
+	return imp.DaemonData
+}
+
 func (imp *Import) Run() {
 	runtime.GC()
 	memStats := &runtime.MemStats{}

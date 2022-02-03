@@ -2,11 +2,11 @@ package daemons
 
 import (
 	"analitics/pkg/config"
-	"github.com/mitchellh/mapstructure"
 )
 
 type Daemon interface {
 	Run()
+	Data() *DaemonData
 	SetData(data *DaemonData)
 }
 
@@ -34,26 +34,4 @@ func (factory *Factory) Register(name string, factoryFunc func() Daemon) {
 
 func (factory *Factory) CreateInstance(name string) Daemon {
 	return (*factory)[name]()
-}
-
-func New(name string) Daemon {
-	if cfg, ok := config.Application.Daemons[name]; ok {
-		if cfg.Enabled {
-			cfg.Name = name
-			d := factory.CreateInstance(name)
-			dd := &DaemonData{}
-			err := mapstructure.Decode(cfg, &dd)
-			if err != nil {
-				config.Logger.Error().Err(err).Msg("")
-				return nil
-			}
-			d.SetData(dd)
-			return d
-		} else {
-			config.Logger.Info().Msgf("Daemon '%s' is disabled!", name)
-		}
-	} else {
-		config.Logger.Info().Msgf("Daemon '%s' not found!", name)
-	}
-	return nil
 }

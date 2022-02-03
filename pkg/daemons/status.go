@@ -14,6 +14,10 @@ func (st *Status) SetData(data *DaemonData) {
 	st.DaemonData = data
 }
 
+func (st *Status) Data() *DaemonData {
+	return st.DaemonData
+}
+
 func (st *Status) Run() {
 	server := transport.NewServer()
 	config.Logger.Info().Msg("Http server is starting...")

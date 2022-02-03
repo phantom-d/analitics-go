@@ -1,7 +1,6 @@
 package daemons
 
 import (
-	"analitics/pkg/config"
 	"runtime"
 	"time"
 )
@@ -14,9 +13,12 @@ func (watcher *Watcher) SetData(data *DaemonData) {
 	watcher.DaemonData = data
 }
 
+func (watcher *Watcher) Data() *DaemonData {
+	return watcher.DaemonData
+}
+
 func (watcher *Watcher) Run() {
 	runtime.GC()
-	config.Logger.Info().Msgf("Start daemon '%s'!", watcher.Name)
 	memStats := &runtime.MemStats{}
 	runtime.ReadMemStats(memStats)
 	// TODO: Добавить запуск демонов с контролем сигналов
@@ -24,8 +26,7 @@ func (watcher *Watcher) Run() {
 		for _, cfg := range watcher.Workers {
 			daemon := New(cfg.Name)
 			if daemon != nil {
-				config.Logger.Info().Msgf("Start daemon '%s'!", cfg.Name)
-				daemon.Run()
+				daemon.Data().Start(daemon, true)
 			}
 		}
 		runtime.GC()
