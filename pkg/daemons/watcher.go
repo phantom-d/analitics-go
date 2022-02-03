@@ -2,6 +2,7 @@ package daemons
 
 import (
 	"analitics/pkg/config"
+	"runtime"
 	"time"
 )
 
@@ -14,9 +15,12 @@ func (watcher *Watcher) SetData(data *DaemonData) {
 }
 
 func (watcher *Watcher) Run() {
+	runtime.GC()
 	config.Logger.Info().Msgf("Start daemon '%s'!", watcher.Name)
-	// TODO: Добавить запуск демонов с контролем сигналов и превышения памяти
-	for {
+	memStats := &runtime.MemStats{}
+	runtime.ReadMemStats(memStats)
+	// TODO: Добавить запуск демонов с контролем сигналов
+	for memStats.Alloc <= watcher.MemoryLimit {
 		for _, cfg := range watcher.Workers {
 			daemon := New(cfg.Name)
 			if daemon != nil {
@@ -24,6 +28,8 @@ func (watcher *Watcher) Run() {
 				daemon.Run()
 			}
 		}
+		runtime.GC()
+		runtime.ReadMemStats(memStats)
 		time.Sleep(time.Duration(watcher.Sleep) * time.Second)
 	}
 }

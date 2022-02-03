@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/mitchellh/mapstructure"
 	"github.com/rs/zerolog"
+	"runtime"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type resultProcess struct {
 	Queue      string
 	Duration   time.Duration
 	Total      int
+	Memory     uint64
 	ErrorItems []map[string]interface{}
 }
 
@@ -38,7 +40,10 @@ func (imp *Import) SetData(data *DaemonData) {
 }
 
 func (imp *Import) Run() {
-	for {
+	runtime.GC()
+	memStats := &runtime.MemStats{}
+	runtime.ReadMemStats(memStats)
+	for memStats.Alloc <= imp.MemoryLimit {
 		for _, cfg := range imp.Workers {
 			worker := workers.New(cfg)
 			if worker != nil {
@@ -53,20 +58,28 @@ func (imp *Import) Run() {
 				}
 			}
 		}
+		runtime.GC()
+		runtime.ReadMemStats(memStats)
 		time.Sleep(time.Duration(imp.Sleep) * time.Second)
 	}
 }
 
 func (imp *Import) Process(w *workers.Worker) {
+	runtime.GC()
+	memStats := &runtime.MemStats{}
+	runtime.ReadMemStats(memStats)
 	config.Logger.Info().Msgf("Start worker '%s'!", w.Name)
 	db := database.New(config.Application.Database, false)
-	// TODO: Добавить запуск демонов с контролем сигналов и превышения памяти
-	for {
+	// TODO: Добавить запуск демонов с контролем сигналов
+	for memStats.Alloc <= w.MemoryLimit {
+		config.Logger.Debug().Msgf("1. Memory worker '%v'", memStats.Alloc)
 		timeStart := time.Now()
 		tr := transport.New(imp.Params)
 		data, errorData := tr.Client.GetEntities(w.Queue)
 		result := resultProcess{Queue: w.Queue}
-		for errorData == nil && len(data.Data) > 0 {
+		runtime.ReadMemStats(memStats)
+		for memStats.Alloc <= w.MemoryLimit && errorData == nil && len(data.Data) > 0 {
+			config.Logger.Debug().Msgf("2. Memory worker '%v'", memStats.Alloc)
 			result.PackageID = data.PackageID
 			_, err := w.BeforeIteration(data.Data)
 			if err != nil {
@@ -87,6 +100,8 @@ func (imp *Import) Process(w *workers.Worker) {
 				}
 			}
 			result.Duration = time.Now().Sub(timeStart)
+			runtime.ReadMemStats(memStats)
+			result.Memory = memStats.Alloc
 			err = imp.Confirm(w, result)
 			if err != nil {
 				config.Logger.Error().Err(err).Msg("")
@@ -96,17 +111,23 @@ func (imp *Import) Process(w *workers.Worker) {
 				config.Logger.Error().Err(err).Msg("")
 			}
 			timeStart = time.Now()
+			runtime.GC()
+			runtime.ReadMemStats(memStats)
 			data, errorData = tr.Client.GetEntities(w.Queue)
 		}
 
 		if errorData != nil || len(data.Data) == 0 {
 			result = resultProcess{Queue: w.Queue}
 			result.Duration = time.Now().Sub(timeStart)
+			runtime.ReadMemStats(memStats)
+			result.Memory = memStats.Alloc
 			err := imp.Confirm(w, result)
 			if err != nil {
 				config.Logger.Error().Err(err).Msg("")
 			}
 		}
+		runtime.GC()
+		runtime.ReadMemStats(memStats)
 		time.Sleep(time.Duration(w.Sleep) * time.Second)
 	}
 }
@@ -130,7 +151,12 @@ func (imp *Import) Confirm(w *workers.Worker, data resultProcess) (err error) {
 	if err != nil {
 		return
 	}
+
 	config.Logger.Info().
+		Dict("context", zerolog.Dict().
+			Uint64("memory", data.Memory).
+			Str("category", "exchange_import"),
+		).
 		Dict("message_json", zerolog.Dict().
 			Str("queue", logData.Queue).
 			Float64("duration", logData.Duration).

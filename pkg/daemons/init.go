@@ -12,7 +12,7 @@ type Daemon interface {
 
 type DaemonData struct {
 	Name        string                 `mapstructure:"Name"`
-	MemoryLimit int64                  `mapstructure:"MemoryLimit"`
+	MemoryLimit uint64                 `mapstructure:"MemoryLimit"`
 	Workers     []config.Worker        `mapstructure:"Workers"`
 	Params      map[string]interface{} `mapstructure:"Params"`
 	Sleep       int64                  `mapstructure:"Sleep"`

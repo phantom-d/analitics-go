@@ -21,17 +21,18 @@ type Config struct {
 type Daemon struct {
 	Name        string                 `yaml:"name"`
 	Enabled     bool                   `yaml:"enabled"`
-	MemoryLimit int64                  `yaml:"memory-limit"`
+	MemoryLimit uint64                 `yaml:"memory-limit"`
 	Sleep       int64                  `yaml:"sleep"`
 	Workers     []Worker               `yaml:"workers"`
 	Params      map[string]interface{} `yaml:"params"`
 }
 
 type Worker struct {
-	Name    string `yaml:"name"`
-	Queue   string `yaml:"queue"`
-	Enabled bool   `yaml:"enabled"`
-	Sleep   int64  `yaml:"sleep"`
+	Name        string `yaml:"name"`
+	MemoryLimit uint64 `yaml:"memory-limit"`
+	Queue       string `yaml:"queue"`
+	Enabled     bool   `yaml:"enabled"`
+	Sleep       int64  `yaml:"sleep"`
 }
 
 var (

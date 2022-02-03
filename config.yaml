@@ -34,6 +34,7 @@ daemons:
         user-agent: "Analitics Exchange"
     workers:
       - enabled: true
+        memory-limit: 73400320
         name: ProductPrices
         queue: product-price
         sleep: 60

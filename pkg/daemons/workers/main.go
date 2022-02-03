@@ -4,14 +4,16 @@ import (
 	"analitics/pkg/config"
 	"analitics/pkg/database"
 	"analitics/pkg/transport"
+	"github.com/mitchellh/mapstructure"
 )
 
 type Worker struct {
-	Name    string
-	Queue   string
-	Enabled bool
-	Sleep   int64
-	Job     Job
+	Name        string `mapstructure:"Name"`
+	MemoryLimit uint64 `mapstructure:"MemoryLimit"`
+	Queue       string `mapstructure:"Queue"`
+	Enabled     bool   `mapstructure:"Enabled"`
+	Sleep       int64  `mapstructure:"Sleep"`
+	Job         Job
 }
 
 type Job interface {
@@ -21,12 +23,11 @@ type Job interface {
 
 func New(cfg config.Worker) *Worker {
 	if cfg.Enabled {
-		worker := &Worker{
-			Name:    cfg.Name,
-			Queue:   cfg.Queue,
-			Enabled: cfg.Enabled,
-			Sleep:   cfg.Sleep,
-			Job:     factory.CreateInstance(cfg.Name),
+		worker := &Worker{Job: factory.CreateInstance(cfg.Name)}
+		err := mapstructure.Decode(cfg, &worker)
+		if err != nil {
+			config.Logger.Info().Msg("Worker load config")
+			return nil
 		}
 		return worker
 	} else {
