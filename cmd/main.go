@@ -10,6 +10,6 @@ func main() {
 	database.Migrate()
 	daemon := daemons.New(config.Application.Daemon)
 	if daemon != nil {
-		daemon.Data().Start(daemon, false)
+		daemon.Start(daemon, false)
 	}
 }

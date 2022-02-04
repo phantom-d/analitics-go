@@ -26,7 +26,7 @@ func (watcher *Watcher) Run() {
 		for _, cfg := range watcher.Workers {
 			daemon := New(cfg.Name)
 			if daemon != nil {
-				daemon.Data().Start(daemon, true)
+				daemon.Start(daemon, true)
 			}
 		}
 		runtime.GC()

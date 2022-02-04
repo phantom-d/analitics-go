@@ -16,6 +16,7 @@ type Config struct {
 	MigrateUp  bool
 	Database   map[string]interface{} `yaml:"database"`
 	Daemons    map[string]Daemon
+	Signal     string
 }
 
 type Daemon struct {
@@ -47,6 +48,9 @@ func init() {
 	flag.StringVarP(&Application.Daemon, "daemon", "d", "watcher", "Daemon name to starting")
 	flag.BoolVar(&Application.MigrateUp, "migrate", false, "Start with migrate up")
 	flag.BoolVar(&Application.Debug, "debug", false, "Enable debug mode")
+	flag.StringVarP(&Application.Signal, "signal", "s", "", `Send signal to the daemon:
+  quit — graceful shutdown
+  stop — fast shutdown`)
 	flag.Parse()
 
 	if filepath.IsAbs(Application.PidDir) == false {
