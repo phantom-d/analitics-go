@@ -4,8 +4,6 @@ import (
 	goflag "flag"
 	"github.com/rs/zerolog"
 	flag "github.com/spf13/pflag"
-	"os"
-	"path/filepath"
 )
 
 type Config struct {
@@ -44,7 +42,7 @@ var (
 func init() {
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.StringVarP(&Application.ConfigPath, "config", "c", "config.yaml", "Path to a config file")
-	flag.StringVarP(&Application.PidDir, "pids", "p", "./pids", "Path to a save pid files")
+	flag.StringVarP(&Application.PidDir, "pid-dir", "p", "pids", "Path to a save pid files")
 	flag.StringVarP(&Application.Daemon, "daemon", "d", "watcher", "Daemon name to starting")
 	flag.BoolVar(&Application.MigrateUp, "migrate", false, "Start with migrate up")
 	flag.BoolVar(&Application.Debug, "debug", false, "Enable debug mode")
@@ -52,22 +50,6 @@ func init() {
   quit — graceful shutdown
   stop — fast shutdown`)
 	flag.Parse()
-
-	if filepath.IsAbs(Application.PidDir) == false {
-		PidPath, err := filepath.Abs(Application.PidDir)
-		if err != nil {
-			Logger.Fatal().Err(err).Msg("")
-		}
-		Application.PidDir = PidPath
-	}
-
-	if _, err := os.Stat(Application.PidDir); os.IsNotExist(err) {
-		err := os.Mkdir(Application.PidDir, os.ModePerm)
-		if err != nil {
-			Logger.Fatal().Err(err).Msg("Not read config file!")
-		}
-	}
-
 	GetLogger()
 	GetConfig()
 }

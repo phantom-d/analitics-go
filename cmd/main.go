@@ -4,6 +4,8 @@ import (
 	"analitics/pkg/config"
 	"analitics/pkg/daemons"
 	"analitics/pkg/database"
+
+	_ "go.uber.org/automaxprocs"
 )
 
 func main() {
