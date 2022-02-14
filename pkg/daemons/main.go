@@ -43,53 +43,51 @@ func New(name string) Daemon {
 
 func (dd *DaemonData) Start(d Daemon, daemonize bool) {
 	if daemonize {
+		daemon.AddCommand(daemon.StringFlag(&config.Application.Signal, "quit"), syscall.SIGQUIT, dd.termHandler)
+		daemon.AddCommand(daemon.StringFlag(&config.Application.Signal, "stop"), syscall.SIGTERM, dd.termHandler)
+		dd.stop = make(chan struct{})
+		dd.done = make(chan struct{})
 
-	}
-	daemon.AddCommand(daemon.StringFlag(&config.Application.Signal, "quit"), syscall.SIGQUIT, dd.termHandler)
-	daemon.AddCommand(daemon.StringFlag(&config.Application.Signal, "stop"), syscall.SIGTERM, dd.termHandler)
-	dd.stop = make(chan struct{})
-	dd.done = make(chan struct{})
+		cntxt := &daemon.Context{
+			PidFileName: fmt.Sprintf("%s/%s.pid", config.Application.PidDir, dd.Name),
+			PidFilePerm: 0644,
+			LogFileName: "/dev/stdout",
+			LogFilePerm: 0640,
+			WorkDir:     "./",
+			Args:        []string{"[--daemon=" + dd.Name + "]"},
+		}
 
-	cntxt := &daemon.Context{
-		PidFileName: fmt.Sprintf("%s/%s.pid", config.Application.PidDir, dd.Name),
-		PidFilePerm: 0644,
-		LogFileName: "/dev/stdout",
-		LogFilePerm: 0640,
-		WorkDir:     "./",
-		Umask:       027,
-		Args:        []string{"[--daemon=" + dd.Name + "]"},
-	}
+		if len(daemon.ActiveFlags()) > 0 {
+			d, err := cntxt.Search()
+			if err != nil {
+				config.Logger.Fatal().Err(err).Msg("Unable send signal to the daemon")
+			}
+			if err = daemon.SendCommands(d); err != nil {
+				config.Logger.Error().Err(err).Msg("Error send signal to the daemon")
+			}
+			return
+		}
 
-	if len(daemon.ActiveFlags()) > 0 {
-		d, err := cntxt.Search()
+		dm, err := cntxt.Reborn()
 		if err != nil {
-			config.Logger.Fatal().Err(err).Msg("Unable send signal to the daemon")
+			log.Fatalln(err)
 		}
-		if err = daemon.SendCommands(d); err != nil {
-			config.Logger.Error().Err(err).Msg("Error send signal to the daemon")
+		if dm != nil {
+			return
 		}
-		return
+		defer cntxt.Release()
+
+		config.Logger.Info().Msgf("Start daemon '%s'!", dd.Name)
+
+		go dd.worker()
+
+		err = daemon.ServeSignals()
+		if err != nil {
+			config.Logger.Error().Err(err).Msg("")
+		}
+
+		config.Logger.Info().Msgf("daemon '%s' terminated", dd.Name)
 	}
-
-	dm, err := cntxt.Reborn()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if dm != nil {
-		return
-	}
-	defer cntxt.Release()
-
-	config.Logger.Info().Msgf("Start daemon '%s'!", dd.Name)
-
-	go dd.worker()
-
-	err = daemon.ServeSignals()
-	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
-	}
-
-	config.Logger.Info().Msgf("daemon '%s' terminated", dd.Name)
 	d.Run()
 }
 
