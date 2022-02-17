@@ -2,16 +2,14 @@ package daemons
 
 import (
 	"analitics/pkg/config"
-	"crypto/sha1"
+	"context"
 	"fmt"
-	"io"
-	"log"
+	"github.com/mitchellh/mapstructure"
 	"os"
+	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
-
-	"github.com/mitchellh/mapstructure"
-	"github.com/sevlyar/go-daemon"
 )
 
 func New(name string) Daemon {
@@ -25,10 +23,11 @@ func New(name string) Daemon {
 				config.Logger.Error().Err(err).Msg("")
 				return nil
 			}
-
-			if err := dd.checkBinary(); err != nil {
-				config.Logger.Error().Err(err).Msg("")
-				return nil
+			dd.Context = &Context{
+				PidFileName: fmt.Sprintf("%s/%s.pid", config.Application.PidDir, dd.Name),
+				PidFilePerm: 0644,
+				WorkDir:     "./",
+				Args:        []string{"[--daemon=" + dd.Name + "]"},
 			}
 			d.SetData(dd)
 			return d
@@ -41,102 +40,76 @@ func New(name string) Daemon {
 	return nil
 }
 
-func (dd *DaemonData) Start(d Daemon, daemonize bool) {
-	if daemonize {
-		daemon.AddCommand(daemon.StringFlag(&config.Application.Signal, "quit"), syscall.SIGQUIT, dd.termHandler)
-		daemon.AddCommand(daemon.StringFlag(&config.Application.Signal, "stop"), syscall.SIGTERM, dd.termHandler)
-		dd.stop = make(chan struct{})
-		dd.done = make(chan struct{})
-
-		cntxt := &daemon.Context{
-			PidFileName: fmt.Sprintf("%s/%s.pid", config.Application.PidDir, dd.Name),
-			PidFilePerm: 0644,
-			LogFileName: "/dev/stdout",
-			LogFilePerm: 0640,
-			WorkDir:     "./",
-			Args:        []string{"[--daemon=" + dd.Name + "]"},
-		}
-
-		if len(daemon.ActiveFlags()) > 0 {
-			d, err := cntxt.Search()
-			if err != nil {
-				config.Logger.Fatal().Err(err).Msg("Unable send signal to the daemon")
-			}
-			if err = daemon.SendCommands(d); err != nil {
-				config.Logger.Error().Err(err).Msg("Error send signal to the daemon")
-			}
-			return
-		}
-
-		dm, err := cntxt.Reborn()
-		if err != nil {
-			log.Fatalln(err)
-		}
-		if dm != nil {
-			return
-		}
-		defer cntxt.Release()
-
-		config.Logger.Info().Msgf("Start daemon '%s'!", dd.Name)
-
-		go dd.worker()
-
-		err = daemon.ServeSignals()
-		if err != nil {
-			config.Logger.Error().Err(err).Msg("")
-		}
-
-		config.Logger.Info().Msgf("daemon '%s' terminated", dd.Name)
-	}
-	d.Run()
-}
-
-func (dd *DaemonData) checkBinary() error {
-	//get path to binary and confirm its writable
-	binPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to find binary path (%s)", err)
-	}
-	dd.binPath = binPath
-	if info, err := os.Stat(binPath); err != nil {
-		return fmt.Errorf("failed to stat binary (%s)", err)
-	} else if info.Size() == 0 {
-		return fmt.Errorf("binary file is empty")
-	} else {
-		//copy permissions
-		dd.binPerms = info.Mode()
-	}
-	f, err := os.Open(binPath)
-	if err != nil {
-		return fmt.Errorf("cannot read binary (%s)", err)
-	}
-	//initial hash of file
-	hash := sha1.New()
-	_, _ = io.Copy(hash, f)
-	dd.binHash = hash.Sum(nil)
-	_ = f.Close()
-	return nil
-}
-
-func (dd *DaemonData) termHandler(sig os.Signal) error {
-	config.Logger.Info().Msgf("daemon '%s' terminating...", dd.Name)
-	dd.stop <- struct{}{}
-	if sig == syscall.SIGQUIT {
-		<-dd.done
-	}
-	return daemon.ErrStop
-}
-
-func (dd *DaemonData) worker() {
-LOOP:
+// Start daemon
+func Start(d Daemon) (err error) {
+	var memStats *runtime.MemStats
+	dd := d.Data()
+	config.Logger.Info().Msgf("Start daemon '%s'!", dd.Name)
+	d.MakeDaemon()
 	for {
-		// this is work to be done by worker.
-		time.Sleep(time.Second)
 		select {
-		case <-dd.stop:
-			break LOOP
-		default:
+		case <-dd.ctx.Done():
+			return
+		case <-time.Tick(dd.Sleep):
+			runtime.GC()
+			runtime.ReadMemStats(memStats)
+			for memStats.Alloc <= dd.MemoryLimit {
+				if err = d.Run(); err != nil {
+					return
+				}
+			}
 		}
 	}
-	dd.done <- struct{}{}
+}
+
+// Execute daemon as a new system process
+func Exec(d Daemon) (err error) {
+	_, err = d.Data().Context.Run()
+	return
+}
+
+func (dd *DaemonData) Data() *DaemonData {
+	return dd
+}
+
+func (dd *DaemonData) MakeDaemon() {
+	var cancel context.CancelFunc
+	dd.ctx, cancel = context.WithCancel(context.Background())
+	dd.signalChan = make(chan os.Signal, 1)
+	signal.Notify(dd.signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	defer func() {
+		signal.Stop(dd.signalChan)
+		cancel()
+	}()
+
+	go func() {
+		for {
+			select {
+			case s := <-dd.signalChan:
+				switch s {
+				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
+					config.Logger.Info().Msgf("daemon '%s' terminated", dd.Name)
+					cancel()
+					dd.Terminate(s)
+					os.Exit(1)
+				}
+			case <-dd.ctx.Done():
+				config.Logger.Info().Msgf("daemon '%s' is done", dd.Name)
+				os.Exit(1)
+			}
+		}
+	}()
+}
+
+func (dd *DaemonData) Terminate(s os.Signal) {
+	for _, cfg := range dd.Workers {
+		if daemon := New(cfg.Name); daemon != nil {
+			if dm, _ := daemon.Data().Context.Search(); dm != nil {
+				if err := dm.Signal(s); err != nil {
+					config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", dd.Name)
+				}
+			}
+		}
+	}
 }

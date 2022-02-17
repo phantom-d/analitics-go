@@ -5,14 +5,15 @@ import (
 	"analitics/pkg/database"
 	"analitics/pkg/transport"
 	"github.com/mitchellh/mapstructure"
+	"time"
 )
 
 type Worker struct {
-	Name        string `mapstructure:"Name"`
-	MemoryLimit uint64 `mapstructure:"MemoryLimit"`
-	Queue       string `mapstructure:"Queue"`
-	Enabled     bool   `mapstructure:"Enabled"`
-	Sleep       int64  `mapstructure:"Sleep"`
+	Name        string        `mapstructure:"Name"`
+	MemoryLimit uint64        `mapstructure:"MemoryLimit"`
+	Queue       string        `mapstructure:"Queue"`
+	Enabled     bool          `mapstructure:"Enabled"`
+	Sleep       time.Duration `mapstructure:"Sleep"`
 	Job         Job
 }
 

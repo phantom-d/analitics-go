@@ -12,7 +12,7 @@ daemons:
   watcher:
     enabled: true
     memory-limit: 33554432
-    sleep: 5
+    sleep: 5s
     workers:
       - name: status
         enabled: true
@@ -24,7 +24,7 @@ daemons:
   import:
     enabled: true
     memory-limit: 33554432
-    sleep: 5
+    sleep: 5s
     params:
       client:
         type: http
@@ -37,4 +37,4 @@ daemons:
         memory-limit: 73400320
         name: ProductPrices
         queue: product-price
-        sleep: 60
+        sleep: 60s

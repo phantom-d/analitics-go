@@ -1,8 +1,8 @@
 package daemons
 
 import (
-	"runtime"
-	"time"
+	"analitics/pkg/config"
+	"os"
 )
 
 type Watcher struct {
@@ -13,24 +13,17 @@ func (watcher *Watcher) SetData(data *DaemonData) {
 	watcher.DaemonData = data
 }
 
-func (watcher *Watcher) Data() *DaemonData {
-	return watcher.DaemonData
-}
-
-func (watcher *Watcher) Run() {
-	runtime.GC()
-	memStats := &runtime.MemStats{}
-	runtime.ReadMemStats(memStats)
-	// TODO: Добавить запуск демонов с контролем сигналов
-	for memStats.Alloc <= watcher.MemoryLimit {
-		for _, cfg := range watcher.Workers {
-			daemon := New(cfg.Name)
-			if daemon != nil {
-				daemon.Start(daemon, true)
+func (watcher *Watcher) Run() (err error) {
+	for _, cfg := range watcher.Workers {
+		if daemon := New(cfg.Name); daemon != nil {
+			var dm *os.Process
+			if dm, err = daemon.Data().Context.Search(); dm == nil {
+				if err = Exec(daemon); err != nil {
+					config.Logger.Error().Err(err).Msgf("Exec daemon '%s'", cfg.Name)
+					err = nil
+				}
 			}
 		}
-		runtime.GC()
-		runtime.ReadMemStats(memStats)
-		time.Sleep(time.Duration(watcher.Sleep) * time.Second)
 	}
+	return
 }

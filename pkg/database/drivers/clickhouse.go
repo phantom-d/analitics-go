@@ -47,8 +47,7 @@ func (click *Clickhouse) Connect() *sql.DB {
 func (click *Clickhouse) MigrateUp(source string) {
 	m, err := migrate.New(source, click.dsn("clickhouse"))
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("Migration")
-		return
+		config.Logger.Fatal().Err(err).Msg("Migration")
 	}
 	config.Logger.Info().Msg("Migration: start...")
 	err = m.Up()

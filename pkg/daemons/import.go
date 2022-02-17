@@ -39,33 +39,22 @@ func (imp *Import) SetData(data *DaemonData) {
 	imp.DaemonData = data
 }
 
-func (imp *Import) Data() *DaemonData {
-	return imp.DaemonData
-}
-
-func (imp *Import) Run() {
-	runtime.GC()
-	memStats := &runtime.MemStats{}
-	runtime.ReadMemStats(memStats)
-	for memStats.Alloc <= imp.MemoryLimit {
-		for _, cfg := range imp.Workers {
-			worker := workers.New(cfg)
-			if worker != nil {
-				_, err := worker.BeforeRun()
-				if err != nil {
-					config.Logger.Error().Err(err).Msg("")
-				}
-				imp.Process(worker)
-				_, err = worker.AfterRun()
-				if err != nil {
-					config.Logger.Error().Err(err).Msg("")
-				}
+func (imp *Import) Run() (err error) {
+	for _, cfg := range imp.Workers {
+		worker := workers.New(cfg)
+		if worker != nil {
+			_, err := worker.BeforeRun()
+			if err != nil {
+				config.Logger.Error().Err(err).Msg("")
+			}
+			imp.Process(worker)
+			_, err = worker.AfterRun()
+			if err != nil {
+				config.Logger.Error().Err(err).Msg("")
 			}
 		}
-		runtime.GC()
-		runtime.ReadMemStats(memStats)
-		time.Sleep(time.Duration(imp.Sleep) * time.Second)
 	}
+	return
 }
 
 func (imp *Import) Process(w *workers.Worker) {
@@ -132,7 +121,7 @@ func (imp *Import) Process(w *workers.Worker) {
 		}
 		runtime.GC()
 		runtime.ReadMemStats(memStats)
-		time.Sleep(time.Duration(w.Sleep) * time.Second)
+		time.Sleep(w.Sleep * time.Second)
 	}
 }
 
