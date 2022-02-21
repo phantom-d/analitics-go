@@ -58,4 +58,4 @@ EXPOSE ${HTTP_BIND}
 
 ENTRYPOINT [ "/app/analitics" ]
 
-CMD [ "--migrate", "--config=/app/config.yaml", "--pid-dir=pids" ]
+CMD [ "--migrate", "--daemon=watcher", "--config=/app/config.yaml", "--pid-dir=pids" ]
