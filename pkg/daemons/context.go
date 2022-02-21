@@ -2,6 +2,8 @@ package daemons
 
 import (
 	"analitics/pkg/config"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -13,10 +15,14 @@ import (
 func (d *Context) Search() (daemon *os.Process, err error) {
 	if len(d.PidFileName) > 0 {
 		var pid int
-		if pid, err = config.ReadPidFile(d.PidFileName); err != nil {
-			return
+		if _, err = os.Stat(d.PidFileName); err == nil {
+			if pid, err = config.ReadPidFile(d.PidFileName); err != nil {
+				return
+			}
+			daemon, err = os.FindProcess(pid)
+		} else if errors.Is(err, fs.ErrNotExist) {
+			err = nil
 		}
-		daemon, err = os.FindProcess(pid)
 	}
 	return
 }
@@ -50,6 +56,7 @@ func (d *Context) Run() (child *os.Process, err error) {
 		},
 	}
 
+	d.Args = append([]string{d.abspath}, d.Args...)
 	if child, err = os.StartProcess(d.abspath, d.Args, attr); err != nil {
 		if d.pidFile != nil {
 			_ = d.pidFile.Remove()
@@ -59,29 +66,22 @@ func (d *Context) Run() (child *os.Process, err error) {
 	return
 }
 
-func (d *Context) openFiles() (err error) {
-	if d.PidFilePerm == 0 {
-		d.PidFilePerm = FILE_PERM
-	}
-
+func (d *Context) CreatePidFile() (err error) {
 	if len(d.PidFileName) > 0 {
+		if d.PidFilePerm == 0 {
+			d.PidFilePerm = FILE_PERM
+		}
 		if d.PidFileName, err = filepath.Abs(d.PidFileName); err != nil {
-			return err
-		}
-		if d.pidFile, err = config.OpenLockFile(d.PidFileName, d.PidFilePerm); err != nil {
 			return
 		}
-		if err = d.pidFile.Lock(); err != nil {
+		if d.pidFile, err = config.CreatePidFile(d.PidFileName, d.PidFilePerm); err != nil {
 			return
-		}
-		if len(d.Chroot) > 0 {
-			// Calculate PID-file absolute path in child's environment
-			if d.PidFileName, err = filepath.Rel(d.Chroot, d.PidFileName); err != nil {
-				return err
-			}
-			d.PidFileName = "/" + d.PidFileName
 		}
 	}
+	return
+}
+
+func (d *Context) openFiles() (err error) {
 	d.rpipe, _, err = os.Pipe()
 	return
 }

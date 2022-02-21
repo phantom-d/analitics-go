@@ -7,7 +7,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"os"
 	"os/signal"
-	"runtime"
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -20,14 +20,18 @@ func New(name string) Daemon {
 			dd := &DaemonData{}
 			err := mapstructure.Decode(cfg, &dd)
 			if err != nil {
-				config.Logger.Error().Err(err).Msg("")
+				config.Logger.Error().Err(err).Msgf("Init daemon '%s'", name)
 				return nil
 			}
+			pidFileName, err := filepath.Abs(fmt.Sprintf("%s/%s.pid", config.Application.PidDir, dd.Name))
+			if err != nil {
+				config.Logger.Fatal().Err(err).Msgf("Init daemon '%s'", name)
+			}
 			dd.Context = &Context{
-				PidFileName: fmt.Sprintf("%s/%s.pid", config.Application.PidDir, dd.Name),
+				PidFileName: pidFileName,
 				PidFilePerm: 0644,
 				WorkDir:     "./",
-				Args:        []string{"[--daemon=" + dd.Name + "]"},
+				Args:        []string{"--daemon=" + dd.Name},
 			}
 			d.SetData(dd)
 			return d
@@ -42,38 +46,16 @@ func New(name string) Daemon {
 
 // Start daemon
 func Start(d Daemon) (err error) {
-	var memStats *runtime.MemStats
-	dd := d.Data()
+	var (
+		//memStats *runtime.MemStats
+		cancel context.CancelFunc
+	)
+	dd := *d.Data()
 	config.Logger.Info().Msgf("Start daemon '%s'!", dd.Name)
-	d.MakeDaemon()
-	for {
-		select {
-		case <-dd.ctx.Done():
-			return
-		case <-time.Tick(dd.Sleep):
-			runtime.GC()
-			runtime.ReadMemStats(memStats)
-			for memStats.Alloc <= dd.MemoryLimit {
-				if err = d.Run(); err != nil {
-					return
-				}
-			}
-		}
+	err = dd.Context.CreatePidFile()
+	if err != nil {
+		return
 	}
-}
-
-// Execute daemon as a new system process
-func Exec(d Daemon) (err error) {
-	_, err = d.Data().Context.Run()
-	return
-}
-
-func (dd *DaemonData) Data() *DaemonData {
-	return dd
-}
-
-func (dd *DaemonData) MakeDaemon() {
-	var cancel context.CancelFunc
 	dd.ctx, cancel = context.WithCancel(context.Background())
 	dd.signalChan = make(chan os.Signal, 1)
 	signal.Notify(dd.signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -100,16 +82,47 @@ func (dd *DaemonData) MakeDaemon() {
 			}
 		}
 	}()
+	for {
+		select {
+		case <-dd.ctx.Done():
+			return
+		case <-time.Tick(dd.Sleep):
+			//runtime.GC()
+			//runtime.ReadMemStats(memStats)
+			//for memStats.Alloc <= dd.MemoryLimit {
+			if err = d.Run(); err != nil {
+				return
+			}
+			//}
+		}
+	}
+}
+
+// Execute daemon as a new system process
+func Exec(d Daemon) (err error) {
+	_, err = d.Data().Context.Run()
+	return
+}
+
+func (dd *DaemonData) Data() *DaemonData {
+	return dd
 }
 
 func (dd *DaemonData) Terminate(s os.Signal) {
 	for _, cfg := range dd.Workers {
 		if daemon := New(cfg.Name); daemon != nil {
-			if dm, _ := daemon.Data().Context.Search(); dm != nil {
+			dm, err := daemon.Data().Context.Search()
+			if err != nil {
+				config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", dd.Name)
+			} else {
 				if err := dm.Signal(s); err != nil {
 					config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", dd.Name)
 				}
 			}
 		}
+	}
+	err := dd.Context.Release()
+	if err != nil {
+		config.Logger.Error().Err(err).Msgf("Daemon '%s' terminate", dd.Name)
 	}
 }

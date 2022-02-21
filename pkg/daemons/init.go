@@ -15,7 +15,6 @@ type Daemon interface {
 	Run() error
 	Data() *DaemonData
 	SetData(*DaemonData)
-	MakeDaemon()
 	Terminate(os.Signal)
 }
 
@@ -26,6 +25,9 @@ type DaemonData struct {
 	Params      map[string]interface{} `mapstructure:"Params"`
 	Sleep       time.Duration          `mapstructure:"Sleep"`
 	Context     *Context
+	binPath     string
+	binPerms    os.FileMode
+	binHash     []byte
 	ctx         context.Context
 	signalChan  chan os.Signal
 	done        chan struct{}
@@ -42,8 +44,6 @@ type Context struct {
 	// If WorkDir is non-empty, the child changes into the directory before
 	// creating the process.
 	WorkDir string
-	// If Chroot is non-empty, the child changes root directory
-	Chroot string
 
 	// If Env is non-nil, it gives the environment variables for the
 	// daemon-process in the form returned by os.Environ.
