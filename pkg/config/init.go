@@ -11,6 +11,7 @@ type Config struct {
 	ConfigPath string
 	PidDir     string
 	Daemon     string
+	Worker     string
 	Debug      bool
 	MigrateUp  bool
 	Database   map[string]interface{} `yaml:"database"`
@@ -45,6 +46,7 @@ func init() {
 	flag.StringVarP(&Application.ConfigPath, "config", "c", "config.yaml", "Path to a config file")
 	flag.StringVarP(&Application.PidDir, "pid-dir", "p", "pids", "Path to a save pid files")
 	flag.StringVarP(&Application.Daemon, "daemon", "d", "watcher", "Daemon name to starting")
+	flag.StringVarP(&Application.Worker, "worker", "w", "", "Warker name to starting")
 	flag.BoolVar(&Application.MigrateUp, "migrate", false, "Start with migrate up")
 	flag.BoolVar(&Application.Debug, "debug", false, "Enable debug mode")
 	flag.StringVarP(&Application.Signal, "signal", "s", "", `Send signal to the daemon:

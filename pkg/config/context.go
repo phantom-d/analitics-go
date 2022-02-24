@@ -1,13 +1,47 @@
-package daemons
+package config
 
 import (
-	"analitics/pkg/config"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
 )
+
+// Default file permissions for log and pid files.
+const FilePerm = os.FileMode(0640)
+
+// A Context describes daemon context.
+type Context struct {
+	// If PidFileName is non-empty, parent process will try to create and lock
+	// pid file with given name. Child process writes process id to file.
+	PidFileName string
+	// Permissions for new pid file.
+	PidFilePerm os.FileMode
+
+	// If WorkDir is non-empty, the child changes into the directory before
+	// creating the process.
+	WorkDir string
+
+	// If Env is non-nil, it gives the environment variables for the
+	// daemon-process in the form returned by os.Environ.
+	// If it is nil, the result of os.Environ will be used.
+	Env []string
+	// If Args is non-nil, it gives the command-line args for the
+	// daemon-process. If it is nil, the result of os.Args will be used.
+	Args []string
+
+	// Credential holds user and group identities to be assumed by a daemon-process.
+	Credential *syscall.Credential
+	// If Umask is non-zero, the daemon-process call Umask() func with given value.
+	Umask int
+
+	// Struct contains only serializable public fields (!!!)
+	abspath string
+	pidFile *LockFile
+
+	rpipe *os.File
+}
 
 // Search searches daemons process by given in context pid file name.
 // If success returns pointer on daemons os.Process structure,
@@ -16,7 +50,7 @@ func (d *Context) Search() (daemon *os.Process, err error) {
 	if len(d.PidFileName) > 0 {
 		var pid int
 		if _, err = os.Stat(d.PidFileName); err == nil {
-			if pid, err = config.ReadPidFile(d.PidFileName); err != nil {
+			if pid, err = ReadPidFile(d.PidFileName); err != nil {
 				return
 			}
 			daemon, err = os.FindProcess(pid)
@@ -69,12 +103,12 @@ func (d *Context) Run() (child *os.Process, err error) {
 func (d *Context) CreatePidFile() (err error) {
 	if len(d.PidFileName) > 0 {
 		if d.PidFilePerm == 0 {
-			d.PidFilePerm = FILE_PERM
+			d.PidFilePerm = FilePerm
 		}
 		if d.PidFileName, err = filepath.Abs(d.PidFileName); err != nil {
 			return
 		}
-		if d.pidFile, err = config.CreatePidFile(d.PidFileName, d.PidFilePerm); err != nil {
+		if d.pidFile, err = CreatePidFile(d.PidFileName, d.PidFilePerm); err != nil {
 			return
 		}
 	}

@@ -27,7 +27,7 @@ func New(name string) Daemon {
 			if err != nil {
 				config.Logger.Fatal().Err(err).Msgf("Init daemon '%s'", name)
 			}
-			dd.Context = &Context{
+			dd.Context = &config.Context{
 				PidFileName: pidFileName,
 				PidFilePerm: 0644,
 				WorkDir:     "./",
@@ -47,7 +47,6 @@ func New(name string) Daemon {
 // Start daemon
 func Start(d Daemon) (err error) {
 	var (
-		//memStats *runtime.MemStats
 		cancel context.CancelFunc
 	)
 	dd := *d.Data()
@@ -73,7 +72,7 @@ func Start(d Daemon) (err error) {
 				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
 					config.Logger.Info().Msgf("daemon '%s' terminated", dd.Name)
 					cancel()
-					dd.Terminate(s)
+					d.Terminate(s)
 					os.Exit(1)
 				}
 			case <-dd.ctx.Done():
@@ -87,13 +86,9 @@ func Start(d Daemon) (err error) {
 		case <-dd.ctx.Done():
 			return
 		case <-time.Tick(dd.Sleep):
-			//runtime.GC()
-			//runtime.ReadMemStats(memStats)
-			//for memStats.Alloc <= dd.MemoryLimit {
 			if err = d.Run(); err != nil {
 				return
 			}
-			//}
 		}
 	}
 }
@@ -113,10 +108,10 @@ func (dd *DaemonData) Terminate(s os.Signal) {
 		if daemon := New(cfg.Name); daemon != nil {
 			dm, err := daemon.Data().Context.Search()
 			if err != nil {
-				config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", dd.Name)
+				config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
 			} else {
 				if err := dm.Signal(s); err != nil {
-					config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", dd.Name)
+					config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
 				}
 			}
 		}
