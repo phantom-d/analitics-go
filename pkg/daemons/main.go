@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"syscall"
 	"time"
 )
@@ -27,11 +28,25 @@ func New(name string) Daemon {
 			if err != nil {
 				config.Logger.Fatal().Err(err).Msgf("Init daemon '%s'", name)
 			}
+			var args []string
+			notExists := true
+			daemonArg := "--daemon=" + dd.Name
+
+			for _, arg := range os.Args {
+				if matched, _ := regexp.MatchString(`--daemon=`, arg); matched {
+					arg = daemonArg
+					notExists = false
+				}
+				args = append(args, arg)
+			}
+			if notExists {
+				args = append(args, daemonArg)
+			}
 			dd.Context = &config.Context{
 				PidFileName: pidFileName,
 				PidFilePerm: 0644,
 				WorkDir:     "./",
-				Args:        []string{"--daemon=" + dd.Name},
+				Args:        args,
 			}
 			d.SetData(dd)
 			return d

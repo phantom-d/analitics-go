@@ -33,9 +33,9 @@ func (pp *ProductPrices) Save(ds *database.Datastore) (result interface{}, err e
 	inserts := make([][]interface{}, 0, len(pp.Prices))
 	for _, price := range pp.Prices {
 		insert := make([]interface{}, 0, 5)
-		if pp.checkExist(price, ds) {
-			continue
-		}
+		//if pp.checkExist(price, ds) {
+		//	continue
+		//}
 		timeSrc := time.Unix(price.LastUpdate, 0)
 		date := fmt.Sprintf("%d-%02d-%02d", timeSrc.Year(), timeSrc.Month(), timeSrc.Day())
 		dateTime := fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
