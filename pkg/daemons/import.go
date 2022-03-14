@@ -53,11 +53,16 @@ func (imp *Import) Terminate(s os.Signal) {
 	for _, cfg := range imp.Workers {
 		if worker := workers.New(cfg, imp.Name, imp.Params); worker != nil {
 			dm, err := worker.Context.Search()
+			config.Logger.Debug().Msgf("Terminate worker dm: '%+v'", dm)
+			config.Logger.Debug().Msgf("Terminate worker Context: '%+v'", worker.Context)
 			if err != nil {
 				config.Logger.Error().Err(err).Msgf("Terminate worker '%s'", cfg.Name)
 			} else {
 				if err := dm.Signal(s); err != nil {
 					config.Logger.Error().Err(err).Msgf("Terminate worker '%s'", cfg.Name)
+				}
+				if _, err = dm.Wait(); err != nil {
+					config.Logger.Error().Err(err).Msgf("Wait process worker '%s'", cfg.Name)
 				}
 			}
 		}

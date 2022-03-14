@@ -101,7 +101,7 @@ func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []str
 }
 
 func (pp *ProductPrices) checkExist(price ProductPrice, ds *database.Datastore) (result bool) {
-	config.Logger.Debug().Msg(fmt.Sprintf("%+v", price))
+	config.Logger.Debug().Msgf("ProductPrices.checkExist: %+v", price)
 	query := `SELECT * FROM product_price WHERE product = ? AND price_type = ? ORDER BY price_time DESC LIMIT 1`
 	item := &productPrice{}
 	rows, err := ds.Connect().Query(query, pp.ProductGuid, price.PriceGuid)

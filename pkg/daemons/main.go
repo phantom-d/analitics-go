@@ -33,6 +33,9 @@ func New(name string) Daemon {
 			daemonArg := "--daemon=" + dd.Name
 
 			for _, arg := range os.Args {
+				if matched, _ := regexp.MatchString(`--migrate`, arg); matched {
+					continue
+				}
 				if matched, _ := regexp.MatchString(`--daemon=`, arg); matched {
 					arg = daemonArg
 					notExists = false
@@ -43,6 +46,7 @@ func New(name string) Daemon {
 				args = append(args, daemonArg)
 			}
 			dd.Context = &config.Context{
+				Type:        `daemon`,
 				PidFileName: pidFileName,
 				PidFilePerm: 0644,
 				WorkDir:     "./",
@@ -51,7 +55,7 @@ func New(name string) Daemon {
 			d.SetData(dd)
 			return d
 		} else {
-			config.Logger.Debug().Msgf("Daemon '%s' is disabled!", name)
+			//config.Logger.Debug().Msgf("Daemon '%s' is disabled!", name)
 		}
 	} else {
 		config.Logger.Info().Msgf("Daemon '%s' not found!", name)
@@ -86,8 +90,8 @@ func Start(d Daemon) (err error) {
 				switch s {
 				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
 					config.Logger.Info().Msgf("daemon '%s' terminated", dd.Name)
-					cancel()
 					d.Terminate(s)
+					cancel()
 					os.Exit(1)
 				}
 			case <-dd.ctx.Done():
@@ -122,11 +126,16 @@ func (dd *DaemonData) Terminate(s os.Signal) {
 	for _, cfg := range dd.Workers {
 		if daemon := New(cfg.Name); daemon != nil {
 			dm, err := daemon.Data().Context.Search()
+			config.Logger.Debug().Msgf("Terminate daemon dm: '%+v'", dm)
+			config.Logger.Debug().Msgf("Terminate daemon Context: '%+v'", daemon.Data().Context)
 			if err != nil {
 				config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
 			} else {
 				if err := dm.Signal(s); err != nil {
 					config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
+				}
+				if _, err = dm.Wait(); err != nil {
+					config.Logger.Error().Err(err).Msgf("Wait process worker '%s'", cfg.Name)
 				}
 			}
 		}

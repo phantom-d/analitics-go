@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"syscall"
 )
@@ -13,6 +14,7 @@ const FilePerm = os.FileMode(0640)
 
 // A Context describes daemon context.
 type Context struct {
+	Type string
 	// If PidFileName is non-empty, parent process will try to create and lock
 	// pid file with given name. Child process writes process id to file.
 	PidFileName string
@@ -37,10 +39,7 @@ type Context struct {
 	Umask int
 
 	// Struct contains only serializable public fields (!!!)
-	abspath string
 	pidFile *LockFile
-
-	rpipe *os.File
 }
 
 // Search searches daemons process by given in context pid file name.
@@ -53,6 +52,7 @@ func (d *Context) Search() (daemon *os.Process, err error) {
 			if pid, err = ReadPidFile(d.PidFileName); err != nil {
 				return
 			}
+			Logger.Debug().Msgf("Search %s '%s': %v", d.Type, d.PidFileName, pid)
 			daemon, err = os.FindProcess(pid)
 		} else if errors.Is(err, fs.ErrNotExist) {
 			err = nil
@@ -75,23 +75,24 @@ func (d *Context) Run() (child *os.Process, err error) {
 	}
 
 	defer d.closeFiles()
-	if err = d.openFiles(); err != nil {
-		return
-	}
 
-	attr := &os.ProcAttr{
-		Dir:   d.WorkDir,
-		Env:   d.Env,
-		Files: d.files(),
-		Sys: &syscall.SysProcAttr{
+	cmd := &exec.Cmd{
+		Path:   d.Args[0],
+		Args:   d.Args,
+		Dir:    d.WorkDir,
+		Env:    d.Env,
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		SysProcAttr: &syscall.SysProcAttr{
 			//Chroot:     d.Chroot,
 			Credential: d.Credential,
 			Setsid:     true,
 		},
 	}
+	defer cmd.Wait()
 
-	d.Args = append([]string{d.abspath}, d.Args...)
-	if child, err = os.StartProcess(d.abspath, d.Args, attr); err != nil {
+	if err = cmd.Start(); err != nil {
 		if d.pidFile != nil {
 			_ = d.pidFile.Remove()
 		}
@@ -115,11 +116,6 @@ func (d *Context) CreatePidFile() (err error) {
 	return
 }
 
-func (d *Context) openFiles() (err error) {
-	d.rpipe, _, err = os.Pipe()
-	return
-}
-
 func (d *Context) closeFiles() (err error) {
 	if d.pidFile != nil {
 		_ = d.pidFile.Close()
@@ -129,10 +125,6 @@ func (d *Context) closeFiles() (err error) {
 }
 
 func (d *Context) prepareEnv() (err error) {
-	if d.abspath, err = os.Executable(); err != nil {
-		return
-	}
-
 	if len(d.Args) == 0 {
 		d.Args = os.Args
 	}

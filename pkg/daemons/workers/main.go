@@ -32,9 +32,12 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 		}
 		var args []string
 		notExists := true
-		daemonArg := "--daemon=" + parent + " --worker=" + cfg.Name
+		daemonArg := "--daemon=" + parent
 
 		for _, arg := range os.Args {
+			if matched, _ := regexp.MatchString(`--migrate`, arg); matched {
+				continue
+			}
 			if matched, _ := regexp.MatchString(`--daemon=`, arg); matched {
 				arg = daemonArg
 				notExists = false
@@ -44,7 +47,9 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 		if notExists {
 			args = append(args, daemonArg)
 		}
+		args = append(args, "--worker="+cfg.Name)
 		worker.Context = &config.Context{
+			Type:        `worker`,
 			PidFileName: pidFileName,
 			PidFilePerm: 0644,
 			WorkDir:     "./",
@@ -82,6 +87,7 @@ func (w *Worker) Run() (err error) {
 				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
 					config.Logger.Info().Msgf("worker '%s' terminated", w.Name)
 					cancel()
+					w.Terminate(s)
 					err := w.Context.Release()
 					if err != nil {
 						config.Logger.Error().Err(err).Msgf("Worker '%s' terminate", w.Name)
@@ -112,7 +118,6 @@ func (w *Worker) Run() (err error) {
 			if memStats.Alloc > w.MemoryLimit {
 				break
 			}
-			config.Logger.Debug().Msgf("1. Memory worker '%v'", memStats.Alloc)
 			timeStart := time.Now()
 			tr := transport.New(w.Params)
 			data, errorData := tr.Client.GetEntities(w.Queue)
@@ -122,7 +127,6 @@ func (w *Worker) Run() (err error) {
 				if memStats.Alloc > w.MemoryLimit {
 					break
 				}
-				config.Logger.Debug().Msgf("2. Memory worker '%v'", memStats.Alloc)
 				result.PackageID = data.PackageID
 				_, err := w.BeforeIteration(data.Data)
 				if err != nil {
