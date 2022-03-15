@@ -14,6 +14,7 @@ const FilePerm = os.FileMode(0640)
 
 // A Context describes daemon context.
 type Context struct {
+	Name string
 	Type string
 	// If PidFileName is non-empty, parent process will try to create and lock
 	// pid file with given name. Child process writes process id to file.
@@ -112,6 +113,24 @@ func (d *Context) CreatePidFile() (err error) {
 		if d.pidFile, err = CreatePidFile(d.PidFileName, d.PidFilePerm); err != nil {
 			return
 		}
+	}
+	return
+}
+
+func (d *Context) GetStatus() (result bool, err error) {
+	var dm *os.Process
+	dm, err = d.Search()
+	if err != nil {
+		Logger.Error().Err(err).Msgf("Status %s '%s'", d.Type, d.Name)
+	} else if dm != nil {
+		err = dm.Signal(syscall.Signal(0))
+		if err == os.ErrProcessDone {
+			dm = nil
+		}
+	}
+
+	if dm != nil {
+		result = true
 	}
 	return
 }

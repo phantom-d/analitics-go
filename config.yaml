@@ -14,13 +14,8 @@ daemons:
     memory-limit: 33554432
     sleep: 5s
     workers:
-      - name: status
-        enabled: true
       - name: import
         enabled: true
-  status:
-    enabled: false
-    memory-limit: 33554432
   import:
     enabled: true
     memory-limit: 33554432

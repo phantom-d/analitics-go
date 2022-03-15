@@ -49,6 +49,7 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 		}
 		args = append(args, "--worker="+cfg.Name)
 		worker.Context = &config.Context{
+			Name:        cfg.Name,
 			Type:        `worker`,
 			PidFileName: pidFileName,
 			PidFilePerm: 0644,

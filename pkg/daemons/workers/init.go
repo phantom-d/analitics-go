@@ -59,5 +59,8 @@ func (factory *Factory) Register(name string, factoryFunc func() Job) {
 }
 
 func (factory *Factory) CreateInstance(name string) Job {
+	if _, ok := (*factory)[name]; !ok {
+		return nil
+	}
 	return (*factory)[name]()
 }

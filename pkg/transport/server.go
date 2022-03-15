@@ -2,7 +2,7 @@ package transport
 
 import (
 	"analitics/pkg/config"
-	"encoding/json"
+	//"analitics/pkg/daemons"
 	"net/http"
 	"os"
 
@@ -25,13 +25,17 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) GetDaemonsStatusV1(w http.ResponseWriter, r *http.Request) {
-	daemonsStatus := ""
-	response, err := json.Marshal(daemonsStatus)
-	if err != nil {
-		config.Logger.Error().Err(err).Msg("Response hasn't been marshaled.")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	name := ``
+	if keys, ok := r.URL.Query()["daemon"]; ok {
+		name = keys[0]
 	}
+	response := []byte(`test: ` + name)
+	//response, err := daemons.DaemonsStatus(name)
+	//if err != nil {
+	//	config.Logger.Error().Err(err).Msg("Response hasn't been marshaled.")
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
 
 	result, err := w.Write(response)
 	if err != nil {

@@ -2,7 +2,9 @@ package daemons
 
 import (
 	"analitics/pkg/config"
+	"analitics/pkg/daemons/workers"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
 	"os"
@@ -46,6 +48,7 @@ func New(name string) Daemon {
 				args = append(args, daemonArg)
 			}
 			dd.Context = &config.Context{
+				Name:        name,
 				Type:        `daemon`,
 				PidFileName: pidFileName,
 				PidFilePerm: 0644,
@@ -118,6 +121,32 @@ func Exec(d Daemon) (err error) {
 	return
 }
 
+func DaemonsStatus(name string) (result []byte, err error) {
+	daemonsStatus := make(map[string]DaemonStatus)
+	if name == `` {
+		name = `watcher`
+	}
+	if name != "" {
+		if daemon := New(name); daemon != nil {
+			if daemon.Data().Name == `watcher` {
+				for _, cfg := range daemon.Data().Workers {
+					if worker := New(cfg.Name); worker != nil {
+						if daemonStatus, err := worker.Data().getWorkersStatus(); err == nil {
+							daemonsStatus[cfg.Name] = daemonStatus
+						}
+					}
+				}
+			} else {
+				if daemonStatus, err := daemon.Data().getWorkersStatus(); err == nil {
+					daemonsStatus[name] = daemonStatus
+				}
+			}
+		}
+	}
+	result, err = json.Marshal(daemonsStatus)
+	return
+}
+
 func (dd *DaemonData) Data() *DaemonData {
 	return dd
 }
@@ -144,4 +173,17 @@ func (dd *DaemonData) Terminate(s os.Signal) {
 	if err != nil {
 		config.Logger.Error().Err(err).Msgf("Daemon '%s' terminate", dd.Name)
 	}
+}
+
+func (dd *DaemonData) getWorkersStatus() (result DaemonStatus, err error) {
+	result = DaemonStatus{}
+	for _, cfg := range dd.Workers {
+		if worker := workers.New(cfg, dd.Name, dd.Params); worker != nil {
+			result.Count.Total += 1
+			if status, err := worker.Context.GetStatus(); err == nil && status {
+				result.Count.Current += 1
+			}
+		}
+	}
+	return
 }

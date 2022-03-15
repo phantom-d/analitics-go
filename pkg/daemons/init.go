@@ -26,6 +26,13 @@ type DaemonData struct {
 	done        chan struct{}
 }
 
+type DaemonStatus struct {
+	Count struct {
+		Current int8 `json:"current"`
+		Total   int8 `json:"total"`
+	} `json:"count"`
+}
+
 type Factory map[string]func() Daemon
 
 var factory = make(Factory)
@@ -33,7 +40,6 @@ var factory = make(Factory)
 func init() {
 	factory.Register("watcher", func() Daemon { return &Watcher{} })
 	factory.Register("import", func() Daemon { return &Import{} })
-	factory.Register("status", func() Daemon { return &Status{} })
 }
 
 func (factory *Factory) Register(name string, factoryFunc func() Daemon) {

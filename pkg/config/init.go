@@ -12,6 +12,7 @@ type Config struct {
 	PidDir     string
 	Daemon     string
 	Worker     string
+	Status     bool
 	Debug      bool
 	MigrateUp  bool
 	Database   map[string]interface{} `yaml:"database"`
@@ -48,6 +49,7 @@ func init() {
 	flag.StringVarP(&Application.Daemon, "daemon", "d", "watcher", "Daemon name to starting")
 	flag.StringVarP(&Application.Worker, "worker", "w", "", "Warker name to starting")
 	flag.BoolVar(&Application.MigrateUp, "migrate", false, "Start with migrate up")
+	flag.BoolVar(&Application.Status, "status", false, "Get daemons status")
 	flag.BoolVar(&Application.Debug, "debug", false, "Enable debug mode")
 	flag.StringVarP(&Application.Signal, "signal", "s", "", `Send signal to the daemon:
   quit — graceful shutdown
