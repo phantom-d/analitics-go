@@ -3,8 +3,7 @@ FROM golang:1.17.6-alpine3.15 as builder
 ARG TIME_ZONE="Europe/Moscow"
 
 ENV TIME_ZONE=${TIME_ZONE} \
-	TZ=${TIME_ZONE} \
-	HTTP_BIND=${HTTP_BIND}
+	TZ=${TIME_ZONE}
 
 RUN apk update; \
     apk add --no-cache git gcc upx ca-certificates tzdata; \
