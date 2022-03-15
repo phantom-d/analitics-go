@@ -1,7 +1,6 @@
 FROM golang:1.17.6-alpine3.15 as builder
 
 ARG TIME_ZONE="Europe/Moscow"
-ARG HTTP_BIND=8080
 
 ENV TIME_ZONE=${TIME_ZONE} \
 	TZ=${TIME_ZONE} \
@@ -26,7 +25,6 @@ RUN time upx --ultra-brute programm
 FROM alpine:3.15.0
 
 ARG TIME_ZONE="Europe/Moscow"
-ARG HTTP_BIND=8080
 
 ENV TIME_ZONE=${TIME_ZONE} \
 	TZ=${TIME_ZONE} \
