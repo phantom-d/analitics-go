@@ -21,7 +21,7 @@ COPY . /app
 
 RUN time go get -v -t ./...
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 time go build -v -a -ldflags="-w -s" -o programm ./cmd
-RUN time upx --ultra-brute analitics
+RUN time upx --ultra-brute programm
 
 FROM alpine:3.15.0
 
