@@ -4,16 +4,16 @@ import (
 	"analitics/pkg/config"
 	"database/sql"
 	"github.com/mitchellh/mapstructure"
+	"gorm.io/gorm"
 )
 
 type Datastore struct {
-	config  Connection
-	connect *sql.DB
+	config  ConnectionInterface
+	connect *gorm.DB
 }
 
-type Connection interface {
-	Connect() *sql.DB
-	MigrateUp(source string)
+type ConnectionInterface interface {
+	Connect() *gorm.DB
 }
 
 func New(cfg map[string]interface{}, start bool) (result *Datastore) {
@@ -30,27 +30,35 @@ func New(cfg map[string]interface{}, start bool) (result *Datastore) {
 	return
 }
 
-func Migrate() {
-	if config.Application.MigrateUp {
-		New(config.Application.Database, false).
-			config.
-			MigrateUp("file://migrations")
-	}
-}
-
 func (ds *Datastore) Close() *Datastore {
-	err := ds.connect.Close()
+	db, err := ds.connect.DB()
+	if err != nil {
+		config.Logger.Error().Err(err).Msg("Reconnect")
+	}
+	err = db.Close()
 	if err != nil {
 		config.Logger.Error().Err(err).Msg("Close connection")
 	}
 	return ds
 }
 
-func (ds *Datastore) Connect() (result *sql.DB) {
-	var reconnect bool
+func (ds *Datastore) Connect() (result *gorm.DB) {
+	var (
+		reconnect bool
+		db        *sql.DB
+		err       error
+	)
 	if ds.connect == nil {
 		reconnect = true
-	} else if err := ds.connect.Ping(); err != nil {
+	} else {
+		db, err = ds.connect.DB()
+		if err != nil {
+			reconnect = true
+		}
+	}
+	if ds.connect == nil {
+		reconnect = true
+	} else if err = db.Ping(); err != nil {
 		reconnect = true
 	}
 	if reconnect {
@@ -62,10 +70,7 @@ func (ds *Datastore) Connect() (result *sql.DB) {
 
 func (ds *Datastore) Reconnect() *Datastore {
 	if ds.connect != nil {
-		err := ds.connect.Close()
-		if err != nil {
-			config.Logger.Error().Err(err).Msg("Reconnect")
-		}
+		ds.Close()
 	}
 	ds.connect = ds.config.Connect()
 	return ds

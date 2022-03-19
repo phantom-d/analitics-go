@@ -35,9 +35,6 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 		daemonArg := "--daemon=" + parent
 
 		for _, arg := range os.Args {
-			if matched, _ := regexp.MatchString(`--migrate`, arg); matched {
-				continue
-			}
 			if matched, _ := regexp.MatchString(`--daemon=`, arg); matched {
 				arg = daemonArg
 				notExists = false
@@ -104,6 +101,9 @@ func (w *Worker) Run() (err error) {
 
 	config.Logger.Info().Msgf("Start worker '%s'!", w.Name)
 	db := database.New(config.Application.Database, false)
+	if err := w.Job.Migrate(db); err != nil {
+		config.Logger.Fatal().Err(err).Msgf("Worker '%s' Process", w.Name)
+	}
 	for {
 		select {
 		case <-w.ctx.Done():

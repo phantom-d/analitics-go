@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type Daemon interface {
+type DaemonInterface interface {
 	Run() error
 	Data() *DaemonData
 	SetData(*DaemonData)
@@ -33,19 +33,19 @@ type DaemonStatus struct {
 	} `json:"count"`
 }
 
-type Factory map[string]func() Daemon
+type Factory map[string]func() DaemonInterface
 
 var factory = make(Factory)
 
 func init() {
-	factory.Register("watcher", func() Daemon { return &Watcher{} })
-	factory.Register("import", func() Daemon { return &Import{} })
+	factory.Register("watcher", func() DaemonInterface { return &Watcher{} })
+	factory.Register("import", func() DaemonInterface { return &Import{} })
 }
 
-func (factory *Factory) Register(name string, factoryFunc func() Daemon) {
+func (factory *Factory) Register(name string, factoryFunc func() DaemonInterface) {
 	(*factory)[name] = factoryFunc
 }
 
-func (factory *Factory) CreateInstance(name string) Daemon {
+func (factory *Factory) CreateInstance(name string) DaemonInterface {
 	return (*factory)[name]()
 }

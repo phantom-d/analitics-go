@@ -2,20 +2,18 @@ package drivers
 
 import (
 	"analitics/pkg/config"
-
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
 	"fmt"
+	baseClick "github.com/ClickHouse/clickhouse-go"
+	"gorm.io/driver/clickhouse"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
-
-	"github.com/ClickHouse/clickhouse-go"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/clickhouse"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 type Clickhouse struct {
@@ -27,38 +25,26 @@ type Clickhouse struct {
 	CertPath string `mapstructure:"cert-path"`
 }
 
-func (click *Clickhouse) Connect() *sql.DB {
+func (click *Clickhouse) Connect() *gorm.DB {
 	connect, err := sql.Open("clickhouse", click.dsn("tcp"))
 	if err != nil {
 		config.Logger.Fatal().Err(err).Msg("Error connection to clickhouse")
 	}
 	if err := connect.Ping(); err != nil {
-		if exception, ok := err.(*clickhouse.Exception); ok {
-			fmt.Printf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-		} else {
-			fmt.Println(err)
-		}
+		fmt.Println(err)
 		return nil
 	}
-
-	return connect
-}
-
-func (click *Clickhouse) MigrateUp(source string) {
-	m, err := migrate.New(source, click.dsn("clickhouse"))
+	db, err := gorm.Open(clickhouse.New(clickhouse.Config{Conn: connect}), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+		NamingStrategy: schema.NamingStrategy{
+			SingularTable: true,
+		},
+	})
 	if err != nil {
-		config.Logger.Fatal().Err(err).Msg("Migration")
+		config.Logger.Fatal().Err(err).Msg("Error connection to clickhouse")
 	}
-	config.Logger.Info().Msg("Migration: start...")
-	err = m.Up()
-	if err != nil {
-		if err.Error() == "no change" {
-			config.Logger.Info().Msgf("Migration: %s!", err.Error())
-		} else {
-			config.Logger.Error().Err(err).Msg("Migration")
-		}
-	}
-	config.Logger.Info().Msg("Migration: end...")
+
+	return db
 }
 
 func (click *Clickhouse) dsn(scheme string) (result string) {
@@ -83,7 +69,7 @@ func (click *Clickhouse) dsn(scheme string) (result string) {
 			caCertPool := x509.NewCertPool()
 			caCertPool.AppendCertsFromPEM(caCert)
 
-			if err := clickhouse.RegisterTLSConfig(click.CertPath, &tls.Config{RootCAs: caCertPool}); err != nil {
+			if err := baseClick.RegisterTLSConfig(click.CertPath, &tls.Config{RootCAs: caCertPool}); err != nil {
 				log.Fatalf("Couldn't register tls config: %s", err)
 			}
 			result += "&secure=true&tls_config=" + click.CertPath

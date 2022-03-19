@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func New(name string) Daemon {
+func New(name string) DaemonInterface {
 	if cfg, ok := config.Application.Daemons[name]; ok {
 		if cfg.Enabled {
 			cfg.Name = name
@@ -35,9 +35,6 @@ func New(name string) Daemon {
 			daemonArg := "--daemon=" + dd.Name
 
 			for _, arg := range os.Args {
-				if matched, _ := regexp.MatchString(`--migrate`, arg); matched {
-					continue
-				}
 				if matched, _ := regexp.MatchString(`--daemon=`, arg); matched {
 					arg = daemonArg
 					notExists = false
@@ -58,16 +55,16 @@ func New(name string) Daemon {
 			d.SetData(dd)
 			return d
 		} else {
-			//config.Logger.Debug().Msgf("Daemon '%s' is disabled!", name)
+			//config.Logger.Debug().Msgf("DaemonInterface '%s' is disabled!", name)
 		}
 	} else {
-		config.Logger.Info().Msgf("Daemon '%s' not found!", name)
+		config.Logger.Info().Msgf("DaemonInterface '%s' not found!", name)
 	}
 	return nil
 }
 
 // Start daemon
-func Start(d Daemon) (err error) {
+func Start(d DaemonInterface) (err error) {
 	var (
 		cancel context.CancelFunc
 	)
@@ -116,7 +113,7 @@ func Start(d Daemon) (err error) {
 }
 
 // Execute daemon as a new system process
-func Exec(d Daemon) (err error) {
+func Exec(d DaemonInterface) (err error) {
 	_, err = d.Data().Context.Run()
 	return
 }
@@ -171,7 +168,7 @@ func (dd *DaemonData) Terminate(s os.Signal) {
 	}
 	err := dd.Context.Release()
 	if err != nil {
-		config.Logger.Error().Err(err).Msgf("Daemon '%s' terminate", dd.Name)
+		config.Logger.Error().Err(err).Msgf("DaemonInterface '%s' terminate", dd.Name)
 	}
 }
 
