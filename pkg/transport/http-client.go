@@ -23,8 +23,7 @@ type HttpClient struct {
 	conn      *http.Client
 }
 
-func NewClient(cfg map[string]interface{}) *HttpClient {
-	c := &HttpClient{}
+func (c *HttpClient) Init(cfg map[string]interface{}) TransportInterface {
 	err := mapstructure.Decode(cfg, &c)
 	if err != nil {
 		config.Log().Fatal().Err(err).Msg("Error initialisation HTTP HttpClient!")
@@ -32,7 +31,6 @@ func NewClient(cfg map[string]interface{}) *HttpClient {
 	c.conn = &http.Client{
 		Timeout: time.Second * 10,
 	}
-
 	return c
 }
 

@@ -1,9 +1,5 @@
 package transport
 
-import (
-	"analitics/pkg/config"
-)
-
 type Package struct {
 	PackageID int64                    `json:"package_id,omitempty"`
 	Data      []map[string]interface{} `json:"data,omitempty"`
@@ -31,22 +27,28 @@ type Confirm struct {
 	Type      string `json:"type"`
 }
 
-type Transport interface {
+type TransportInterface interface {
+	Init(cfg map[string]interface{}) TransportInterface
 	GetEntities(string) (*Package, error)
 	ConfirmPackage(string, int64)
 	ResendErrorItems(string, []string) bool
 }
 
-func New(cfg map[string]interface{}) (result Transport) {
-	if cfg == nil {
-		config.Log().Error().Msg("Not defined configuration for http client!")
-		return
-	}
-	if client, ok := cfg["client"].(map[string]interface{}); ok {
-		result = NewClient(client)
-	} else {
-		config.Log().Error().Msg("Incorrect configuration for http client!")
-		return
+type Factory map[string]func() TransportInterface
+
+var factory = make(Factory)
+
+func init() {
+	factory.Register("client-http", func() TransportInterface { return &HttpClient{} })
+}
+
+func (factory *Factory) Register(name string, factoryFunc func() TransportInterface) {
+	(*factory)[name] = factoryFunc
+}
+
+func (factory *Factory) CreateInstance(name string) (result TransportInterface) {
+	if factoryFunc, ok := (*factory)[name]; ok {
+		result = factoryFunc()
 	}
 	return
 }

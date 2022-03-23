@@ -14,6 +14,9 @@ func (factory *Factory) Register(name string, factoryFunc func() Connection) {
 	(*factory)[name] = factoryFunc
 }
 
-func (factory *Factory) CreateInstance(name string) Connection {
-	return (*factory)[name]()
+func (factory *Factory) CreateInstance(name string) (result Connection) {
+	if factoryFunc, ok := (*factory)[name]; ok {
+		result = factoryFunc()
+	}
+	return
 }

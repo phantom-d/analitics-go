@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func New(name string) Daemon {
+func New(name string) DaemonInterface {
 	if cfg, ok := config.App().Daemons[name]; ok {
 		if cfg.Enabled {
 			cfg.Name = name
@@ -67,7 +67,7 @@ func New(name string) Daemon {
 }
 
 // Start daemon
-func Start(d Daemon) (err error) {
+func Start(d DaemonInterface) (err error) {
 	var (
 		cancel context.CancelFunc
 	)
@@ -116,7 +116,7 @@ func Start(d Daemon) (err error) {
 }
 
 // Execute daemon as a new system process
-func Exec(d Daemon) (err error) {
+func Exec(d DaemonInterface) (err error) {
 	_, err = d.Data().Context.Run()
 	return
 }

@@ -120,7 +120,7 @@ func (w *Worker) Run() (err error) {
 				break
 			}
 			timeStart := time.Now()
-			tr := transport.New(w.Params)
+			tr := transport.New("client", w.Params)
 			data, errorData := tr.GetEntities(w.Queue)
 			result := resultProcess{Queue: w.Queue}
 			runtime.ReadMemStats(memStats)
@@ -188,7 +188,7 @@ func (w *Worker) Confirm(data resultProcess) (err error) {
 	errorCount := len(data.ErrorItems)
 	if data.PackageID > 0 {
 		if errorCount == 0 || (data.Total > errorCount && w.AddToQueue(data.ErrorItems)) {
-			tr := transport.New(w.Params)
+			tr := transport.New("client", w.Params)
 			tr.ConfirmPackage(data.Queue, data.PackageID)
 		}
 	}
@@ -255,7 +255,7 @@ func (w *Worker) AddToQueue(errorItems []map[string]interface{}) bool {
 	items, _ := w.Job.ExtractId(errorItems)
 
 	if items != nil {
-		tr := transport.New(w.Params)
+		tr := transport.New("client", w.Params)
 		result = tr.ResendErrorItems(w.Queue, items)
 	}
 
