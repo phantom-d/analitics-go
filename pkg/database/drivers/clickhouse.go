@@ -30,7 +30,7 @@ type Clickhouse struct {
 func (click *Clickhouse) Connect() *sql.DB {
 	connect, err := sql.Open("clickhouse", click.dsn("tcp"))
 	if err != nil {
-		config.Logger.Fatal().Err(err).Msg("Error connection to clickhouse")
+		config.Log().Fatal().Err(err).Msg("Error connection to clickhouse")
 	}
 	if err := connect.Ping(); err != nil {
 		if exception, ok := err.(*clickhouse.Exception); ok {
@@ -47,18 +47,18 @@ func (click *Clickhouse) Connect() *sql.DB {
 func (click *Clickhouse) MigrateUp(source string) {
 	m, err := migrate.New(source, click.dsn("clickhouse"))
 	if err != nil {
-		config.Logger.Fatal().Err(err).Msg("Migration")
+		config.Log().Fatal().Err(err).Msg("Migration")
 	}
-	config.Logger.Info().Msg("Migration: start...")
+	config.Log().Info().Msg("Migration: start...")
 	err = m.Up()
 	if err != nil {
 		if err.Error() == "no change" {
-			config.Logger.Info().Msgf("Migration: %s!", err.Error())
+			config.Log().Info().Msgf("Migration: %s!", err.Error())
 		} else {
-			config.Logger.Error().Err(err).Msg("Migration")
+			config.Log().Error().Err(err).Msg("Migration")
 		}
 	}
-	config.Logger.Info().Msg("Migration: end...")
+	config.Log().Info().Msg("Migration: end...")
 }
 
 func (click *Clickhouse) dsn(scheme string) (result string) {
@@ -90,7 +90,7 @@ func (click *Clickhouse) dsn(scheme string) (result string) {
 		}
 	}
 
-	if config.Application.Debug {
+	if config.App().Debug {
 		result += "&debug=true"
 	}
 	return

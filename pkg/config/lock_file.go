@@ -102,7 +102,7 @@ func (file *LockFile) WritePid() (err error) {
 		return
 	}
 	err = file.Sync()
-	Logger.Debug().Msgf("Write pid '%s': %v", file.Name(), os.Getpid())
+	Log().Debug().Msgf("Write pid '%s': %v", file.Name(), os.Getpid())
 	return
 }
 

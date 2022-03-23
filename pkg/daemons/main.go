@@ -16,19 +16,19 @@ import (
 )
 
 func New(name string) Daemon {
-	if cfg, ok := config.Application.Daemons[name]; ok {
+	if cfg, ok := config.App().Daemons[name]; ok {
 		if cfg.Enabled {
 			cfg.Name = name
 			d := factory.CreateInstance(name)
 			dd := &DaemonData{}
 			err := mapstructure.Decode(cfg, &dd)
 			if err != nil {
-				config.Logger.Error().Err(err).Msgf("Init daemon '%s'", name)
+				config.Log().Error().Err(err).Msgf("Init daemon '%s'", name)
 				return nil
 			}
-			pidFileName, err := filepath.Abs(fmt.Sprintf("%s/%s.pid", config.Application.PidDir, dd.Name))
+			pidFileName, err := filepath.Abs(fmt.Sprintf("%s/%s.pid", config.App().PidDir, dd.Name))
 			if err != nil {
-				config.Logger.Fatal().Err(err).Msgf("Init daemon '%s'", name)
+				config.Log().Fatal().Err(err).Msgf("Init daemon '%s'", name)
 			}
 			var args []string
 			notExists := true
@@ -58,10 +58,10 @@ func New(name string) Daemon {
 			d.SetData(dd)
 			return d
 		} else {
-			//config.Logger.Debug().Msgf("Daemon '%s' is disabled!", name)
+			//config.Log().Debug().Msgf("Daemon '%s' is disabled!", name)
 		}
 	} else {
-		config.Logger.Info().Msgf("Daemon '%s' not found!", name)
+		config.Log().Info().Msgf("Daemon '%s' not found!", name)
 	}
 	return nil
 }
@@ -72,7 +72,7 @@ func Start(d Daemon) (err error) {
 		cancel context.CancelFunc
 	)
 	dd := *d.Data()
-	config.Logger.Info().Msgf("Start daemon '%s'!", dd.Name)
+	config.Log().Info().Msgf("Start daemon '%s'!", dd.Name)
 	err = dd.Context.CreatePidFile()
 	if err != nil {
 		return
@@ -92,13 +92,13 @@ func Start(d Daemon) (err error) {
 			case s := <-dd.signalChan:
 				switch s {
 				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-					config.Logger.Info().Msgf("daemon '%s' terminated", dd.Name)
+					config.Log().Info().Msgf("daemon '%s' terminated", dd.Name)
 					d.Terminate(s)
 					cancel()
 					os.Exit(1)
 				}
 			case <-dd.ctx.Done():
-				config.Logger.Info().Msgf("daemon '%s' is done", dd.Name)
+				config.Log().Info().Msgf("daemon '%s' is done", dd.Name)
 				os.Exit(1)
 			}
 		}
@@ -155,23 +155,23 @@ func (dd *DaemonData) Terminate(s os.Signal) {
 	for _, cfg := range dd.Workers {
 		if daemon := New(cfg.Name); daemon != nil {
 			dm, err := daemon.Data().Context.Search()
-			config.Logger.Debug().Msgf("Terminate daemon dm: '%+v'", dm)
-			config.Logger.Debug().Msgf("Terminate daemon Context: '%+v'", daemon.Data().Context)
+			config.Log().Debug().Msgf("Terminate daemon dm: '%+v'", dm)
+			config.Log().Debug().Msgf("Terminate daemon Context: '%+v'", daemon.Data().Context)
 			if err != nil {
-				config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
+				config.Log().Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
 			} else {
 				if err := dm.Signal(s); err != nil {
-					config.Logger.Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
+					config.Log().Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
 				}
 				if _, err = dm.Wait(); err != nil {
-					config.Logger.Error().Err(err).Msgf("Wait process worker '%s'", cfg.Name)
+					config.Log().Error().Err(err).Msgf("Wait process worker '%s'", cfg.Name)
 				}
 			}
 		}
 	}
 	err := dd.Context.Release()
 	if err != nil {
-		config.Logger.Error().Err(err).Msgf("Daemon '%s' terminate", dd.Name)
+		config.Log().Error().Err(err).Msgf("Daemon '%s' terminate", dd.Name)
 	}
 }
 

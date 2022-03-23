@@ -7,26 +7,34 @@ import (
 	"os"
 )
 
+func App() *Config {
+	return application
+}
+
+func Log() *zerolog.Logger {
+	return &logger
+}
+
 func GetConfig() *Config {
-	content, err := ioutil.ReadFile(Application.ConfigPath)
+	content, err := ioutil.ReadFile(application.ConfigPath)
 	if err != nil {
-		Logger.Fatal().Err(err).Msg("Not read config file!")
+		Log().Fatal().Err(err).Msg("Not read config file!")
 	}
 	content = []byte(os.ExpandEnv(string(content)))
-	if err := yaml.Unmarshal(content, &Application); err != nil {
+	if err := yaml.Unmarshal(content, &application); err != nil {
 		panic(err)
 	}
-	return Application
+	return application
 }
 
 func GetLogger() zerolog.Logger {
 	logLevel := zerolog.InfoLevel
-	if Application.Debug {
+	if application.Debug {
 		logLevel = zerolog.DebugLevel
 	}
 	zerolog.SetGlobalLevel(logLevel)
 	zerolog.TimestampFieldName = "timestamp"
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
-	Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
-	return Logger
+	logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+	return logger
 }

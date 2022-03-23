@@ -20,7 +20,7 @@ func (watcher *Watcher) Run() (err error) {
 			var dm *os.Process
 			dm, err = daemon.Data().Context.Search()
 			if err != nil {
-				config.Logger.Error().Err(err).Msgf("Exec daemon '%s'", cfg.Name)
+				config.Log().Error().Err(err).Msgf("Exec daemon '%s'", cfg.Name)
 			} else if dm != nil {
 				err = dm.Signal(syscall.Signal(0))
 				if err == os.ErrProcessDone {
@@ -29,7 +29,7 @@ func (watcher *Watcher) Run() (err error) {
 			}
 			if dm == nil {
 				if err = Exec(daemon); err != nil {
-					config.Logger.Error().Err(err).Msgf("Exec daemon '%s'", cfg.Name)
+					config.Log().Error().Err(err).Msgf("Exec daemon '%s'", cfg.Name)
 					err = nil
 				}
 			}

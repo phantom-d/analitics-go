@@ -54,7 +54,7 @@ func NewClient(cfg map[string]interface{}) *Client {
 	c := &Client{}
 	err := mapstructure.Decode(cfg, &c)
 	if err != nil {
-		config.Logger.Fatal().Err(err).Msg("Error initialisation HTTP Client!")
+		config.Log().Fatal().Err(err).Msg("Error initialisation HTTP Client!")
 	}
 	c.conn = &http.Client{
 		Timeout: time.Second * 10,
@@ -68,17 +68,17 @@ func (c *Client) GetEntities(queue string) (result *Package, err error) {
 	uri := "entities/" + queue
 	body, err := c.SendRequest(uri, "GET", nil)
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
+		config.Log().Error().Err(err).Msg("")
 		return
 	}
 	if string(body) != "[]" {
 		err = json.Unmarshal(body, &p)
 		if err != nil {
-			config.Logger.Error().Err(err).Msg("")
+			config.Log().Error().Err(err).Msg("")
 		}
 		if p.Message != nil {
 			err = errors.New(*p.Message)
-			config.Logger.Error().Err(err).Msg("")
+			config.Log().Error().Err(err).Msg("")
 		}
 	}
 	result = p
@@ -93,11 +93,11 @@ func (c *Client) ConfirmPackage(queue string, packageID int64) {
 	}
 	data, err := json.Marshal(formData)
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
+		config.Log().Error().Err(err).Msg("")
 	}
 	_, err = c.SendRequest(uri, "POST", data)
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
+		config.Log().Error().Err(err).Msg("")
 	}
 }
 
@@ -113,7 +113,7 @@ func (c *Client) ResendErrorItems(entityType string, entityIDs []string) bool {
 	}
 	sign, err := json.Marshal(errorItemsData)
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
+		config.Log().Error().Err(err).Msg("")
 		return false
 	}
 
@@ -126,12 +126,12 @@ func (c *Client) ResendErrorItems(entityType string, entityIDs []string) bool {
 
 	data, err := json.Marshal(formData)
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
+		config.Log().Error().Err(err).Msg("")
 		return false
 	}
 	_, err = c.SendRequest(uri, "POST", data)
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("")
+		config.Log().Error().Err(err).Msg("")
 		return false
 	}
 	return true
@@ -164,8 +164,8 @@ func (c *Client) SendRequest(uri string, method string, formData []byte) ([]byte
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		if config.Application.Debug {
-			config.Logger.Debug().
+		if config.App().Debug {
+			config.Log().Debug().
 				Dict("data", zerolog.Dict().
 					Str("request", spew.Sdump(req)).
 					Str("body", string(body)),

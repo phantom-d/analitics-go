@@ -23,12 +23,12 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 		worker := &Worker{Job: factory.CreateInstance(cfg.Name), Params: params, Parent: parent}
 		err := mapstructure.Decode(cfg, &worker)
 		if err != nil {
-			config.Logger.Info().Msg("Worker load config")
+			config.Log().Info().Msg("Worker load config")
 			return nil
 		}
-		pidFileName, err := filepath.Abs(fmt.Sprintf("%s/%s_%s.pid", config.Application.PidDir, parent, cfg.Name))
+		pidFileName, err := filepath.Abs(fmt.Sprintf("%s/%s_%s.pid", config.App().PidDir, parent, cfg.Name))
 		if err != nil {
-			config.Logger.Fatal().Err(err).Msgf("Init daemon '%s'", cfg.Name)
+			config.Log().Fatal().Err(err).Msgf("Init daemon '%s'", cfg.Name)
 		}
 		var args []string
 		notExists := true
@@ -58,7 +58,7 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 		}
 		return worker
 	} else {
-		config.Logger.Info().Msgf("Worker '%s' is disabled!", cfg.Name)
+		config.Log().Info().Msgf("Worker '%s' is disabled!", cfg.Name)
 	}
 	return nil
 }
@@ -69,7 +69,7 @@ func (w *Worker) Run() (err error) {
 	)
 	err = w.Context.CreatePidFile()
 	if err != nil {
-		config.Logger.Fatal().Err(err).Msgf("Worker '%s' Process", w.Name)
+		config.Log().Fatal().Err(err).Msgf("Worker '%s' Process", w.Name)
 	}
 	w.ctx, cancel = context.WithCancel(context.Background())
 	w.signalChan = make(chan os.Signal, 1)
@@ -86,24 +86,24 @@ func (w *Worker) Run() (err error) {
 			case s := <-w.signalChan:
 				switch s {
 				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-					config.Logger.Info().Msgf("worker '%s' terminated", w.Name)
+					config.Log().Info().Msgf("worker '%s' terminated", w.Name)
 					cancel()
 					w.Terminate(s)
 					err := w.Context.Release()
 					if err != nil {
-						config.Logger.Error().Err(err).Msgf("Worker '%s' terminate", w.Name)
+						config.Log().Error().Err(err).Msgf("Worker '%s' terminate", w.Name)
 					}
 					os.Exit(1)
 				}
 			case <-w.ctx.Done():
-				config.Logger.Info().Msgf("worker '%s' is done", w.Name)
+				config.Log().Info().Msgf("worker '%s' is done", w.Name)
 				os.Exit(1)
 			}
 		}
 	}()
 
-	config.Logger.Info().Msgf("Start worker '%s'!", w.Name)
-	db := database.New(config.Application.Database, false)
+	config.Log().Info().Msgf("Start worker '%s'!", w.Name)
+	db := database.New(config.App().Database, false)
 	for {
 		select {
 		case <-w.ctx.Done():
@@ -114,7 +114,7 @@ func (w *Worker) Run() (err error) {
 			runtime.ReadMemStats(memStats)
 			_, err = w.BeforeRun()
 			if err != nil {
-				config.Logger.Error().Err(err).Msgf("Worker '%s' processing BeforeRun", w.Name)
+				config.Log().Error().Err(err).Msgf("Worker '%s' processing BeforeRun", w.Name)
 			}
 			if memStats.Alloc > w.MemoryLimit {
 				break
@@ -131,14 +131,14 @@ func (w *Worker) Run() (err error) {
 				result.PackageID = data.PackageID
 				_, err := w.BeforeIteration(data.Data)
 				if err != nil {
-					config.Logger.Error().Err(err).Msgf("Worker '%s' processing BeforeIteration", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing BeforeIteration", w.Name)
 				}
 				if data != nil {
 					result.Total = len(data.Data)
 					for _, item := range data.Data {
 						err = mapstructure.Decode(item, &w.Job)
 						if err != nil {
-							config.Logger.Error().Err(err).Msgf("Worker '%s' processing", w.Name)
+							config.Log().Error().Err(err).Msgf("Worker '%s' processing", w.Name)
 							continue
 						}
 						_, err := w.Job.Save(db)
@@ -152,11 +152,11 @@ func (w *Worker) Run() (err error) {
 				result.Memory = memStats.Alloc
 				err = w.Confirm(result)
 				if err != nil {
-					config.Logger.Error().Err(err).Msgf("Worker '%s' processing Confirm", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing Confirm", w.Name)
 				}
 				_, err = w.AfterIteration(result.ErrorItems)
 				if err != nil {
-					config.Logger.Error().Err(err).Msgf("Worker '%s' processing AfterIteration", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing AfterIteration", w.Name)
 				}
 				timeStart = time.Now()
 				runtime.GC()
@@ -171,14 +171,14 @@ func (w *Worker) Run() (err error) {
 				result.Memory = memStats.Alloc
 				err := w.Confirm(result)
 				if err != nil {
-					config.Logger.Error().Err(err).Msgf("Worker '%s' processing zero Confirm", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing zero Confirm", w.Name)
 				}
 			}
 			runtime.GC()
 			runtime.ReadMemStats(memStats)
 			_, err = w.AfterRun()
 			if err != nil {
-				config.Logger.Error().Err(err).Msgf("Worker '%s' processing AfterRun", w.Name)
+				config.Log().Error().Err(err).Msgf("Worker '%s' processing AfterRun", w.Name)
 			}
 		}
 	}
@@ -204,7 +204,7 @@ func (w *Worker) Confirm(data resultProcess) (err error) {
 		return
 	}
 
-	config.Logger.Info().
+	config.Log().Info().
 		Dict("context", zerolog.Dict().
 			Uint64("memory", data.Memory).
 			Str("category", "exchange_import"),
@@ -230,7 +230,7 @@ func Exec(w *Worker) (err error) {
 func (w *Worker) Terminate(s os.Signal) {
 	err := w.Context.Release()
 	if err != nil {
-		config.Logger.Error().Err(err).Msgf("Worker '%s' terminate", w.Name)
+		config.Log().Error().Err(err).Msgf("Worker '%s' terminate", w.Name)
 	}
 }
 

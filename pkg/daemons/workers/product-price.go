@@ -50,7 +50,7 @@ func (pp *ProductPrices) Save(ds *database.Datastore) (result interface{}, err e
 	query := `INSERT INTO product_price VALUES (?,?,?,?,?)`
 	tx, err := ds.Connect().Begin()
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("begin transaction")
+		config.Log().Error().Err(err).Msg("begin transaction")
 		return
 	}
 	txOK := false
@@ -61,26 +61,26 @@ func (pp *ProductPrices) Save(ds *database.Datastore) (result interface{}, err e
 	}()
 	stmt, err := tx.Prepare(query)
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("Prepare stmt")
+		config.Log().Error().Err(err).Msg("Prepare stmt")
 		return
 	}
 	for _, insert := range inserts {
 		_, err = stmt.Exec(insert...)
 		if err != nil {
-			config.Logger.Error().Err(err).Msg("Loading data")
+			config.Log().Error().Err(err).Msg("Loading data")
 			return
 		}
 	}
 
 	err = stmt.Close()
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("Close stmt")
+		config.Log().Error().Err(err).Msg("Close stmt")
 		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("commit transaction")
+		config.Log().Error().Err(err).Msg("commit transaction")
 		return
 	}
 	txOK = true
@@ -92,7 +92,7 @@ func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []str
 		item := ProductPrices{}
 		err = mapstructure.Decode(row, &item)
 		if err != nil {
-			config.Logger.Error().Err(err).Msg("")
+			config.Log().Error().Err(err).Msg("")
 			continue
 		}
 		result = append(result, item.ProductGuid)
@@ -101,20 +101,20 @@ func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []str
 }
 
 func (pp *ProductPrices) checkExist(price ProductPrice, ds *database.Datastore) (result bool) {
-	config.Logger.Debug().Msgf("ProductPrices.checkExist: %+v", price)
+	config.Log().Debug().Msgf("ProductPrices.checkExist: %+v", price)
 	query := `SELECT * FROM product_price WHERE product = ? AND price_type = ? ORDER BY price_time DESC LIMIT 1`
 	item := &productPrice{}
 	rows, err := ds.Connect().Query(query, pp.ProductGuid, price.PriceGuid)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			config.Logger.Error().Err(err).Msg("ProductPrices.checkExist")
+			config.Log().Error().Err(err).Msg("ProductPrices.checkExist")
 		}
 		return
 	}
 	defer rows.Close()
 	for rows.Next() {
 		if err := rows.Scan(&item.Product, &item.Price, &item.PriceType, &item.PriceDate, &item.PriceTime); err != nil {
-			config.Logger.Error().Err(err).Msg("ProductPrices.checkExist")
+			config.Log().Error().Err(err).Msg("ProductPrices.checkExist")
 		}
 	}
 	if item.Product != "" {

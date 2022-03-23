@@ -53,7 +53,7 @@ func (d *Context) Search() (daemon *os.Process, err error) {
 			if pid, err = ReadPidFile(d.PidFileName); err != nil {
 				return
 			}
-			Logger.Debug().Msgf("Search %s '%s': %v", d.Type, d.PidFileName, pid)
+			Log().Debug().Msgf("Search %s '%s': %v", d.Type, d.PidFileName, pid)
 			daemon, err = os.FindProcess(pid)
 		} else if errors.Is(err, fs.ErrNotExist) {
 			err = nil
@@ -121,7 +121,7 @@ func (d *Context) GetStatus() (result bool, err error) {
 	var dm *os.Process
 	dm, err = d.Search()
 	if err != nil {
-		Logger.Error().Err(err).Msgf("Status %s '%s'", d.Type, d.Name)
+		Log().Error().Err(err).Msgf("Status %s '%s'", d.Type, d.Name)
 	} else if dm != nil {
 		err = dm.Signal(syscall.Signal(0))
 		if err == os.ErrProcessDone {

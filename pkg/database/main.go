@@ -20,7 +20,7 @@ func New(cfg map[string]interface{}, start bool) (result *Datastore) {
 	ds := &Datastore{config: factory.CreateInstance(cfg["type"].(string))}
 	err := mapstructure.Decode(cfg, &ds.config)
 	if err != nil {
-		config.Logger.Fatal().Err(err).Msg("Decode config for database connection")
+		config.Log().Fatal().Err(err).Msg("Decode config for database connection")
 		return
 	}
 	if start {
@@ -31,8 +31,8 @@ func New(cfg map[string]interface{}, start bool) (result *Datastore) {
 }
 
 func Migrate() {
-	if config.Application.MigrateUp {
-		New(config.Application.Database, false).
+	if config.App().MigrateUp {
+		New(config.App().Database, false).
 			config.
 			MigrateUp("file://migrations")
 	}
@@ -41,7 +41,7 @@ func Migrate() {
 func (ds *Datastore) Close() *Datastore {
 	err := ds.connect.Close()
 	if err != nil {
-		config.Logger.Error().Err(err).Msg("Close connection")
+		config.Log().Error().Err(err).Msg("Close connection")
 	}
 	return ds
 }
@@ -64,7 +64,7 @@ func (ds *Datastore) Reconnect() *Datastore {
 	if ds.connect != nil {
 		err := ds.connect.Close()
 		if err != nil {
-			config.Logger.Error().Err(err).Msg("Reconnect")
+			config.Log().Error().Err(err).Msg("Reconnect")
 		}
 	}
 	ds.connect = ds.config.Connect()
