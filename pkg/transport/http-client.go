@@ -15,34 +15,7 @@ import (
 	"time"
 )
 
-type Package struct {
-	PackageID int64                    `json:"package_id,omitempty"`
-	Data      []map[string]interface{} `json:"data,omitempty"`
-	Name      string                   `json:"name,omitempty"`
-	Message   *string                  `json:"message,omitempty"`
-}
-
-type ErrorItems struct {
-	Header struct {
-		Source       string `json:"source"`
-		SourceDetail string `json:"source_detail"`
-		Date         string `json:"date"`
-		Sign         string `json:"sign"`
-	} `json:"header"`
-	Data ErrorItemsData `json:"data"`
-}
-
-type ErrorItemsData struct {
-	Queue string   `json:"queue"`
-	Guids []string `json:"guids"`
-}
-
-type Confirm struct {
-	PackageID int64  `json:"package_id"`
-	Type      string `json:"type"`
-}
-
-type Client struct {
+type HttpClient struct {
 	Host      string `mapstructure:"host"`
 	User      string `mapstructure:"username"`
 	Password  string `mapstructure:"password"`
@@ -50,11 +23,11 @@ type Client struct {
 	conn      *http.Client
 }
 
-func NewClient(cfg map[string]interface{}) *Client {
-	c := &Client{}
+func NewClient(cfg map[string]interface{}) *HttpClient {
+	c := &HttpClient{}
 	err := mapstructure.Decode(cfg, &c)
 	if err != nil {
-		config.Log().Fatal().Err(err).Msg("Error initialisation HTTP Client!")
+		config.Log().Fatal().Err(err).Msg("Error initialisation HTTP HttpClient!")
 	}
 	c.conn = &http.Client{
 		Timeout: time.Second * 10,
@@ -63,7 +36,7 @@ func NewClient(cfg map[string]interface{}) *Client {
 	return c
 }
 
-func (c *Client) GetEntities(queue string) (result *Package, err error) {
+func (c *HttpClient) GetEntities(queue string) (result *Package, err error) {
 	p := new(Package)
 	uri := "entities/" + queue
 	body, err := c.SendRequest(uri, "GET", nil)
@@ -85,7 +58,7 @@ func (c *Client) GetEntities(queue string) (result *Package, err error) {
 	return
 }
 
-func (c *Client) ConfirmPackage(queue string, packageID int64) {
+func (c *HttpClient) ConfirmPackage(queue string, packageID int64) {
 	uri := "confirm-package"
 	formData := Confirm{
 		PackageID: packageID,
@@ -101,7 +74,7 @@ func (c *Client) ConfirmPackage(queue string, packageID int64) {
 	}
 }
 
-func (c *Client) ResendErrorItems(entityType string, entityIDs []string) bool {
+func (c *HttpClient) ResendErrorItems(entityType string, entityIDs []string) bool {
 	if entityIDs == nil {
 		return false
 	}
@@ -137,7 +110,7 @@ func (c *Client) ResendErrorItems(entityType string, entityIDs []string) bool {
 	return true
 }
 
-func (c *Client) SendRequest(uri string, method string, formData []byte) ([]byte, error) {
+func (c *HttpClient) SendRequest(uri string, method string, formData []byte) ([]byte, error) {
 	url := c.Host + "/" + uri + "/"
 	if method == "" {
 		method = "GET"
