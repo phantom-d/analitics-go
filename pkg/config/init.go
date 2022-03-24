@@ -39,7 +39,7 @@ type Worker struct {
 
 var (
 	application *Config = &Config{}
-	logger      zerolog.Logger
+	logger      *zerolog.Logger
 )
 
 func init() {
@@ -55,6 +55,5 @@ func init() {
   quit — graceful shutdown
   stop — fast shutdown`)
 	flag.Parse()
-	GetLogger()
 	GetConfig()
 }

@@ -11,10 +11,6 @@ func App() *Config {
 	return application
 }
 
-func Log() *zerolog.Logger {
-	return &logger
-}
-
 func GetConfig() *Config {
 	content, err := ioutil.ReadFile(application.ConfigPath)
 	if err != nil {
@@ -27,7 +23,19 @@ func GetConfig() *Config {
 	return application
 }
 
-func GetLogger() zerolog.Logger {
+func Log() *zerolog.Logger {
+	if logger == nil {
+		GetLogger()
+	}
+	return logger
+}
+
+func SetLogger(log *zerolog.Logger) *zerolog.Logger {
+	logger = log
+	return logger
+}
+
+func GetLogger() *zerolog.Logger {
 	logLevel := zerolog.InfoLevel
 	if application.Debug {
 		logLevel = zerolog.DebugLevel
@@ -35,6 +43,6 @@ func GetLogger() zerolog.Logger {
 	zerolog.SetGlobalLevel(logLevel)
 	zerolog.TimestampFieldName = "timestamp"
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
-	logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
-	return logger
+	log := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	return SetLogger(&log)
 }

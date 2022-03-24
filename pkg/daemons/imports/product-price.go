@@ -3,9 +3,12 @@ package imports
 import (
 	"analitics/pkg/config"
 	"analitics/pkg/database"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/phantom-d/go-daemons/imports"
+
 	"database/sql"
 	"fmt"
-	"github.com/mitchellh/mapstructure"
 	"time"
 )
 
@@ -16,7 +19,7 @@ type ProductPrice struct {
 }
 
 type ProductPrices struct {
-	*Worker
+	*imports.Worker
 }
 
 type ProductPricesData struct {
@@ -33,8 +36,16 @@ type productPrice struct {
 	PriceTime string `mapstructure:"price_time"`
 }
 
-func (pp *ProductPrices) SetData(data *Worker) {
+func (pp *ProductPrices) SetData(data *imports.Worker) {
 	pp.Worker = data
+}
+
+func (pp ProductPrices) GetEntities() (result interface{}, err error) {
+	return
+}
+
+func (pp ProductPrices) Processing(data interface{}, result *imports.ResultProcess) (err error) {
+	return
 }
 
 func (pp *ProductPrices) Save(ds *database.Datastore, data map[string]interface{}) (result interface{}, err error) {
@@ -101,8 +112,8 @@ func (pp *ProductPrices) Save(ds *database.Datastore, data map[string]interface{
 	return
 }
 
-func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []string, err error) {
-	for _, row := range items {
+func (pp *ProductPrices) ExtractId(items interface{}) (result []string, err error) {
+	for _, row := range items.([]map[string]interface{}) {
 		item := ProductPricesData{}
 		err = mapstructure.Decode(row, &item)
 		if err != nil {

@@ -2,9 +2,10 @@ package main
 
 import (
 	"analitics/pkg/config"
-	"analitics/pkg/daemons"
 	"analitics/pkg/database"
 	"fmt"
+
+	"github.com/phantom-d/go-daemons"
 )
 
 func main() {
