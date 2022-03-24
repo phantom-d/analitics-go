@@ -1,4 +1,4 @@
-package workers
+package imports
 
 import (
 	"analitics/pkg/config"
@@ -16,6 +16,10 @@ type ProductPrice struct {
 }
 
 type ProductPrices struct {
+	*Worker
+}
+
+type ProductPricesData struct {
 	EntityId    int64          `mapstructure:"entity_id"`
 	ProductGuid string         `mapstructure:"product_guid"`
 	Prices      []ProductPrice `mapstructure:"prices"`
@@ -29,19 +33,29 @@ type productPrice struct {
 	PriceTime string `mapstructure:"price_time"`
 }
 
-func (pp *ProductPrices) Save(ds *database.Datastore) (result interface{}, err error) {
-	inserts := make([][]interface{}, 0, len(pp.Prices))
-	for _, price := range pp.Prices {
+func (pp *ProductPrices) SetData(data *Worker) {
+	pp.Worker = data
+}
+
+func (pp *ProductPrices) Save(ds *database.Datastore, data map[string]interface{}) (result interface{}, err error) {
+	item := &ProductPricesData{}
+	err = mapstructure.Decode(data, &item)
+	if err != nil {
+		config.Log().Error().Err(err).Msgf("Worker '%s' processing", pp.Name)
+		return
+	}
+	inserts := make([][]interface{}, 0, len(item.Prices))
+	for _, price := range item.Prices {
 		insert := make([]interface{}, 0, 5)
-		//if pp.checkExist(price, ds) {
-		//	continue
-		//}
+		if item.checkExist(price, ds) {
+			continue
+		}
 		timeSrc := time.Unix(price.LastUpdate, 0)
 		date := fmt.Sprintf("%d-%02d-%02d", timeSrc.Year(), timeSrc.Month(), timeSrc.Day())
 		dateTime := fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
 			timeSrc.Year(), timeSrc.Month(), timeSrc.Day(),
 			timeSrc.Hour(), timeSrc.Minute(), timeSrc.Second())
-		insert = append(insert, pp.ProductGuid, price.Value, price.PriceGuid, date, dateTime)
+		insert = append(insert, item.ProductGuid, price.Value, price.PriceGuid, date, dateTime)
 		inserts = append(inserts, insert)
 	}
 	if len(inserts) == 0 {
@@ -89,7 +103,7 @@ func (pp *ProductPrices) Save(ds *database.Datastore) (result interface{}, err e
 
 func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []string, err error) {
 	for _, row := range items {
-		item := ProductPrices{}
+		item := ProductPricesData{}
 		err = mapstructure.Decode(row, &item)
 		if err != nil {
 			config.Log().Error().Err(err).Msg("")
@@ -100,11 +114,11 @@ func (pp *ProductPrices) ExtractId(items []map[string]interface{}) (result []str
 	return
 }
 
-func (pp *ProductPrices) checkExist(price ProductPrice, ds *database.Datastore) (result bool) {
+func (pd *ProductPricesData) checkExist(price ProductPrice, ds *database.Datastore) (result bool) {
 	config.Log().Debug().Msgf("ProductPrices.checkExist: %+v", price)
 	query := `SELECT * FROM product_price WHERE product = ? AND price_type = ? ORDER BY price_time DESC LIMIT 1`
 	item := &productPrice{}
-	rows, err := ds.Connect().Query(query, pp.ProductGuid, price.PriceGuid)
+	rows, err := ds.Connect().Query(query, pd.ProductGuid, price.PriceGuid)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			config.Log().Error().Err(err).Msg("ProductPrices.checkExist")

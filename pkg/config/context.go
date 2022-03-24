@@ -65,6 +65,8 @@ func (d *Context) Search() (daemon *os.Process, err error) {
 // Release provides correct pid-file release in daemon.
 func (d *Context) Release() (err error) {
 	if d.pidFile != nil {
+		fd := d.pidFile.Fd()
+		Log().Debug().Msgf("Pid `%s` descriptor: %v", d.PidFileName, fd)
 		err = d.pidFile.Remove()
 	}
 	return

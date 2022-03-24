@@ -1,4 +1,4 @@
-package workers
+package imports
 
 import (
 	"analitics/pkg/config"
@@ -18,10 +18,11 @@ import (
 	"time"
 )
 
-func New(cfg config.Worker, parent string, params map[string]interface{}) *Worker {
+func New(cfg config.Worker, parent string, params map[string]interface{}) WorkerInterface {
 	if cfg.Enabled {
-		worker := &Worker{Job: factory.CreateInstance(cfg.Name), Params: params, Parent: parent}
-		err := mapstructure.Decode(cfg, &worker)
+		w := factory.CreateInstance(cfg.Name)
+		wd := &Worker{Params: params, Parent: parent}
+		err := mapstructure.Decode(cfg, &wd)
 		if err != nil {
 			config.Log().Info().Msg("Worker load config")
 			return nil
@@ -48,7 +49,7 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 			args = append(args, daemonArg)
 		}
 		args = append(args, "--worker="+cfg.Name)
-		worker.Context = &config.Context{
+		wd.Context = &config.Context{
 			Name:        cfg.Name,
 			Type:        `worker`,
 			PidFileName: pidFileName,
@@ -56,92 +57,87 @@ func New(cfg config.Worker, parent string, params map[string]interface{}) *Worke
 			WorkDir:     "./",
 			Args:        args,
 		}
-		return worker
+		w.SetData(wd)
+		return w
 	} else {
 		config.Log().Info().Msgf("Worker '%s' is disabled!", cfg.Name)
 	}
 	return nil
 }
 
-func (w *Worker) Run() (err error) {
-	var (
-		cancel context.CancelFunc
-	)
-	err = w.Context.CreatePidFile()
+func Run(w WorkerInterface) (err error) {
+	var cancel context.CancelFunc
+	wd := w.Data()
+	err = wd.Context.CreatePidFile()
 	if err != nil {
-		config.Log().Fatal().Err(err).Msgf("Worker '%s' Process", w.Name)
+		config.Log().Fatal().Err(err).Msgf("Worker '%s' Process", wd.Name)
 	}
-	w.ctx, cancel = context.WithCancel(context.Background())
-	w.signalChan = make(chan os.Signal, 1)
-	signal.Notify(w.signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	wd.ctx, cancel = context.WithCancel(context.Background())
+	wd.signalChan = make(chan os.Signal, 1)
+	signal.Notify(wd.signalChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	defer func() {
-		signal.Stop(w.signalChan)
+		signal.Stop(wd.signalChan)
 		cancel()
 	}()
 
 	go func() {
 		for {
 			select {
-			case s := <-w.signalChan:
+			case s := <-wd.signalChan:
 				switch s {
 				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-					config.Log().Info().Msgf("worker '%s' terminated", w.Name)
+					config.Log().Info().Msgf("worker '%s' terminate", wd.Name)
 					cancel()
-					w.Terminate(s)
-					err := w.Context.Release()
+					wd.Terminate(s)
+					err := wd.Context.Release()
 					if err != nil {
-						config.Log().Error().Err(err).Msgf("Worker '%s' terminate", w.Name)
+						config.Log().Error().Err(err).Msgf("Worker '%s' terminate", wd.Name)
 					}
 					os.Exit(1)
 				}
-			case <-w.ctx.Done():
-				config.Log().Info().Msgf("worker '%s' is done", w.Name)
+			case <-wd.ctx.Done():
+				config.Log().Info().Msgf("worker '%s' is done", wd.Name)
 				os.Exit(1)
 			}
 		}
 	}()
 
-	config.Log().Info().Msgf("Start worker '%s'!", w.Name)
+	config.Log().Info().Msgf("Start worker '%s'!", wd.Name)
 	db := database.New(config.App().Database, false)
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-wd.ctx.Done():
 			return
-		case <-time.Tick(w.Sleep):
+		case <-time.Tick(wd.Sleep):
 			runtime.GC()
 			memStats := &runtime.MemStats{}
 			runtime.ReadMemStats(memStats)
-			_, err = w.BeforeRun()
+			_, err = wd.BeforeRun()
 			if err != nil {
-				config.Log().Error().Err(err).Msgf("Worker '%s' processing BeforeRun", w.Name)
+				config.Log().Error().Err(err).Msgf("Worker '%s' processing BeforeRun", wd.Name)
 			}
-			if memStats.Alloc > w.MemoryLimit {
+			if memStats.Alloc > wd.MemoryLimit {
 				break
 			}
 			timeStart := time.Now()
-			tr := transport.New("client", w.Params)
-			data, errorData := tr.GetEntities(w.Queue)
-			result := resultProcess{Queue: w.Queue}
+			tr := transport.New("client", wd.Params)
+			data, errorData := tr.GetEntities(wd.Queue)
+			result := resultProcess{Queue: wd.Queue}
 			runtime.ReadMemStats(memStats)
 			for errorData == nil && len(data.Data) > 0 {
-				if memStats.Alloc > w.MemoryLimit {
+				if memStats.Alloc > wd.MemoryLimit {
 					break
 				}
 				result.PackageID = data.PackageID
-				_, err := w.BeforeIteration(data.Data)
+				_, err := wd.BeforeIteration(data.Data)
 				if err != nil {
-					config.Log().Error().Err(err).Msgf("Worker '%s' processing BeforeIteration", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing BeforeIteration", wd.Name)
 				}
 				if data != nil {
 					result.Total = len(data.Data)
 					for _, item := range data.Data {
-						err = mapstructure.Decode(item, &w.Job)
-						if err != nil {
-							config.Log().Error().Err(err).Msgf("Worker '%s' processing", w.Name)
-							continue
-						}
-						_, err := w.Job.Save(db)
+						_, err := w.Save(db, item)
 						if err != nil {
 							result.ErrorItems = append(result.ErrorItems, item)
 						}
@@ -150,45 +146,59 @@ func (w *Worker) Run() (err error) {
 				result.Duration = time.Now().Sub(timeStart)
 				runtime.ReadMemStats(memStats)
 				result.Memory = memStats.Alloc
-				err = w.Confirm(result)
+				err = Confirm(w, result)
 				if err != nil {
-					config.Log().Error().Err(err).Msgf("Worker '%s' processing Confirm", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing Confirm", wd.Name)
 				}
-				_, err = w.AfterIteration(result.ErrorItems)
+				_, err = wd.AfterIteration(result.ErrorItems)
 				if err != nil {
-					config.Log().Error().Err(err).Msgf("Worker '%s' processing AfterIteration", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing AfterIteration", wd.Name)
 				}
 				timeStart = time.Now()
 				runtime.GC()
 				runtime.ReadMemStats(memStats)
-				data, errorData = tr.GetEntities(w.Queue)
+				data, errorData = tr.GetEntities(wd.Queue)
 			}
 
 			if errorData != nil || len(data.Data) == 0 {
-				result = resultProcess{Queue: w.Queue}
+				result = resultProcess{Queue: wd.Queue}
 				result.Duration = time.Now().Sub(timeStart)
 				runtime.ReadMemStats(memStats)
 				result.Memory = memStats.Alloc
-				err := w.Confirm(result)
+				err := Confirm(w, result)
 				if err != nil {
-					config.Log().Error().Err(err).Msgf("Worker '%s' processing zero Confirm", w.Name)
+					config.Log().Error().Err(err).Msgf("Worker '%s' processing zero Confirm", wd.Name)
 				}
 			}
 			runtime.GC()
 			runtime.ReadMemStats(memStats)
-			_, err = w.AfterRun()
+			_, err = wd.AfterRun()
 			if err != nil {
-				config.Log().Error().Err(err).Msgf("Worker '%s' processing AfterRun", w.Name)
+				config.Log().Error().Err(err).Msgf("Worker '%s' processing AfterRun", wd.Name)
 			}
 		}
 	}
 }
 
-func (w *Worker) Confirm(data resultProcess) (err error) {
+func AddToQueue(w WorkerInterface, errorItems []map[string]interface{}) bool {
+	result := true
+	wd := w.Data()
+	items, _ := w.ExtractId(errorItems)
+
+	if items != nil {
+		tr := transport.New("client", wd.Params)
+		result = tr.ResendErrorItems(wd.Queue, items)
+	}
+
+	return result
+}
+
+func Confirm(w WorkerInterface, data resultProcess) (err error) {
 	errorCount := len(data.ErrorItems)
+	wd := w.Data()
 	if data.PackageID > 0 {
-		if errorCount == 0 || (data.Total > errorCount && w.AddToQueue(data.ErrorItems)) {
-			tr := transport.New("client", w.Params)
+		if errorCount == 0 || (data.Total > errorCount && AddToQueue(w, data.ErrorItems)) {
+			tr := transport.New("client", wd.Params)
 			tr.ConfirmPackage(data.Queue, data.PackageID)
 		}
 	}
@@ -222,42 +232,34 @@ func (w *Worker) Confirm(data resultProcess) (err error) {
 }
 
 // Execute daemon as a new system process
-func Exec(w *Worker) (err error) {
+func (w *Worker) Run() (err error) {
 	_, err = w.Context.Run()
 	return
 }
 
+func (w *Worker) Data() *Worker {
+	return w
+}
+
+func (w *Worker) GetStatus() (result bool, err error) {
+	return w.Context.GetStatus()
+}
+
 func (w *Worker) Terminate(s os.Signal) {
-	err := w.Context.Release()
-	if err != nil {
-		config.Log().Error().Err(err).Msgf("Worker '%s' terminate", w.Name)
-	}
 }
 
-func (w *Worker) BeforeRun() (interface{}, error) {
-	return config.DynamicCall(w.Job, "BeforeRun")
+func (w *Worker) BeforeRun() (result interface{}, err error) {
+	return
 }
 
-func (w *Worker) AfterRun() (interface{}, error) {
-	return config.DynamicCall(w.Job, "AfterRun")
+func (w *Worker) AfterRun() (result interface{}, err error) {
+	return
 }
 
-func (w *Worker) BeforeIteration(data []map[string]interface{}) (interface{}, error) {
-	return config.DynamicCall(w.Job, "BeforeIteration", data)
+func (w *Worker) BeforeIteration(data []map[string]interface{}) (result interface{}, err error) {
+	return
 }
 
-func (w *Worker) AfterIteration(errorItems []map[string]interface{}) (interface{}, error) {
-	return config.DynamicCall(w.Job, "AfterIteration", errorItems)
-}
-
-func (w *Worker) AddToQueue(errorItems []map[string]interface{}) bool {
-	result := true
-	items, _ := w.Job.ExtractId(errorItems)
-
-	if items != nil {
-		tr := transport.New("client", w.Params)
-		result = tr.ResendErrorItems(w.Queue, items)
-	}
-
-	return result
+func (w *Worker) AfterIteration(errorItems []map[string]interface{}) (result interface{}, err error) {
+	return
 }

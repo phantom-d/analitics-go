@@ -2,7 +2,7 @@ package daemons
 
 import (
 	"analitics/pkg/config"
-	"analitics/pkg/daemons/workers"
+	"analitics/pkg/daemons/imports"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -92,7 +92,7 @@ func Start(d DaemonInterface) (err error) {
 			case s := <-dd.signalChan:
 				switch s {
 				case syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-					config.Log().Info().Msgf("daemon '%s' terminated", dd.Name)
+					config.Log().Info().Msgf("daemon '%s' terminate", dd.Name)
 					d.Terminate(s)
 					cancel()
 					os.Exit(1)
@@ -157,15 +157,12 @@ func (dd *DaemonData) Terminate(s os.Signal) {
 			dm, err := daemon.Data().Context.Search()
 			config.Log().Debug().Msgf("Terminate daemon dm: '%+v'", dm)
 			config.Log().Debug().Msgf("Terminate daemon Context: '%+v'", daemon.Data().Context)
-			if err != nil {
-				config.Log().Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
-			} else {
+			if err == nil {
 				if err := dm.Signal(s); err != nil {
 					config.Log().Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
 				}
-				if _, err = dm.Wait(); err != nil {
-					config.Log().Error().Err(err).Msgf("Wait process worker '%s'", cfg.Name)
-				}
+			} else {
+				config.Log().Error().Err(err).Msgf("Terminate daemon '%s'", cfg.Name)
 			}
 		}
 	}
@@ -176,11 +173,12 @@ func (dd *DaemonData) Terminate(s os.Signal) {
 }
 
 func (dd *DaemonData) getWorkersStatus() (result DaemonStatus, err error) {
+	var status bool
 	result = DaemonStatus{}
 	for _, cfg := range dd.Workers {
-		if worker := workers.New(cfg, dd.Name, dd.Params); worker != nil {
+		if worker := imports.New(cfg, dd.Name, dd.Params); worker != nil {
 			result.Count.Total += 1
-			if status, err := worker.Context.GetStatus(); err == nil && status {
+			if status, err = worker.GetStatus(); status {
 				result.Count.Current += 1
 			}
 		}

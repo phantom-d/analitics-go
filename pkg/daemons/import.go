@@ -2,7 +2,7 @@ package daemons
 
 import (
 	"analitics/pkg/config"
-	"analitics/pkg/daemons/workers"
+	"analitics/pkg/daemons/imports"
 	"os"
 	"syscall"
 )
@@ -17,10 +17,11 @@ func (imp *Import) SetData(data *DaemonData) {
 
 func (imp *Import) Run() (err error) {
 	for _, cfg := range imp.Workers {
-		if worker := workers.New(cfg, imp.Name, imp.Params); worker != nil {
-			if config.App().Worker == "" || config.App().Worker == worker.Name {
+		if worker := imports.New(cfg, imp.Name, imp.Params); worker != nil {
+			wd := worker.Data()
+			if config.App().Worker == "" || config.App().Worker == wd.Name {
 				var dm *os.Process
-				dm, err = worker.Context.Search()
+				dm, err = wd.Context.Search()
 				if err != nil {
 					config.Log().Error().Err(err).Msgf("Exec worker '%s'", cfg.Name)
 				} else if dm != nil {
@@ -30,14 +31,14 @@ func (imp *Import) Run() (err error) {
 					}
 				}
 				if dm == nil {
-					if config.App().Worker == worker.Name {
-						if err = worker.Run(); err != nil {
+					if config.App().Worker == wd.Name {
+						if err = imports.Run(worker); err != nil {
 							config.Log().Error().Err(err).Msgf("Start worker '%s'", cfg.Name)
 							err = nil
 						}
 						break
 					} else {
-						if err = workers.Exec(worker); err != nil {
+						if err = worker.Run(); err != nil {
 							config.Log().Error().Err(err).Msgf("Exec worker '%s'", cfg.Name)
 							err = nil
 						}
@@ -51,19 +52,17 @@ func (imp *Import) Run() (err error) {
 
 func (imp *Import) Terminate(s os.Signal) {
 	for _, cfg := range imp.Workers {
-		if worker := workers.New(cfg, imp.Name, imp.Params); worker != nil {
-			dm, err := worker.Context.Search()
-			config.Log().Debug().Msgf("Terminate worker dm: '%+v'", dm)
-			config.Log().Debug().Msgf("Terminate worker Context: '%+v'", worker.Context)
-			if err != nil {
-				config.Log().Error().Err(err).Msgf("Terminate worker '%s'", cfg.Name)
-			} else {
+		if worker := imports.New(cfg, imp.Name, imp.Params); worker != nil {
+			wd := worker.Data()
+			dm, err := wd.Context.Search()
+			config.Log().Debug().Msgf("Terminate worker process: '%+v'", dm)
+			config.Log().Debug().Msgf("Terminate worker Context: '%+v'", wd.Context)
+			if err == nil {
 				if err := dm.Signal(s); err != nil {
 					config.Log().Error().Err(err).Msgf("Terminate worker '%s'", cfg.Name)
 				}
-				if _, err = dm.Wait(); err != nil {
-					config.Log().Error().Err(err).Msgf("Wait process worker '%s'", cfg.Name)
-				}
+			} else {
+				config.Log().Error().Err(err).Msgf("Terminate worker '%s'", cfg.Name)
 			}
 		}
 	}
